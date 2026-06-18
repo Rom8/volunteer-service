@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17.10
+    container_name: volunteer_service-postgres
+    environment:
+      POSTGRES_DB: volunteer_service
+      POSTGRES_USER: volunteer_service
+      POSTGRES_PASSWORD: volunteer_service
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - volunteer_service_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U volunteer_service -d volunteer_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  volunteer_service_postgres_data:
