@@ -20,7 +20,9 @@ import ru.rom8.rescue.volunteer.repository.ContactInfoRepository;
 import ru.rom8.rescue.volunteer.repository.LocationRepository;
 import ru.rom8.rescue.volunteer.repository.VolunteerRepository;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -70,6 +72,23 @@ public class VolunteerRegistrationService {
                 normalizeFilter(settlementDistrictName),
                 status
         ));
+    }
+
+    @Transactional(readOnly = true)
+    public List<VolunteerDto> getByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> volunteerIds = ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (volunteerIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return volunteerMapper.toDtoList(volunteerRepository.findAllById(volunteerIds));
     }
 
     @Transactional
