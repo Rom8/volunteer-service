@@ -18,6 +18,7 @@ target/
 .idea/vcs.xml
 .idea/libraries/
 .idea/shelf/
+/.idea/WebToolsSettings.xml
 .idea/workspace.xml
 *.iws
 *.iml

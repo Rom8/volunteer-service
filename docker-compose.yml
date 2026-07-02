@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: volunteer_service
       POSTGRES_PASSWORD: volunteer_service
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - volunteer_service_postgres_data:/var/lib/postgresql/data
     healthcheck:
