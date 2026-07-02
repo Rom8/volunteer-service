@@ -11,6 +11,7 @@ import ru.rom8.rescue.volunteer.domain.entity.ContactType;
 import ru.rom8.rescue.volunteer.domain.entity.Location;
 import ru.rom8.rescue.volunteer.domain.entity.LocationKind;
 import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
+import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
 import ru.rom8.rescue.volunteer.dto.VolunteerDto;
 import ru.rom8.rescue.volunteer.dto.VolunteerRegisterRequest;
 import ru.rom8.rescue.volunteer.dto.VolunteerUpdateRequest;
@@ -19,6 +20,7 @@ import ru.rom8.rescue.volunteer.repository.ContactInfoRepository;
 import ru.rom8.rescue.volunteer.repository.LocationRepository;
 import ru.rom8.rescue.volunteer.repository.VolunteerRepository;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -54,6 +56,15 @@ public class VolunteerRegistrationService {
         return volunteerMapper.toDto(getVolunteerByUserId(userId));
     }
 
+    @Transactional(readOnly = true)
+    public List<VolunteerDto> getList(String settlementName, String settlementDistrictName, VolunteerStatus status) {
+        return volunteerMapper.toDtoList(volunteerRepository.findByFilters(
+                normalizeFilter(settlementName),
+                normalizeFilter(settlementDistrictName),
+                status
+        ));
+    }
+
     @Transactional
     public VolunteerDto updateByUserId(String userId, VolunteerUpdateRequest request) {
         Volunteer volunteer = getVolunteerByUserId(userId);
@@ -78,6 +89,10 @@ public class VolunteerRegistrationService {
 
         return volunteerRepository.findByUserId(userId.trim())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE));
+    }
+
+    private String normalizeFilter(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private void updatePersonalInfo(Volunteer volunteer, VolunteerUpdateRequest request) {

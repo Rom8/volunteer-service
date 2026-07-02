@@ -6,11 +6,15 @@ import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
 import ru.rom8.rescue.volunteer.dto.VolunteerDto;
 import ru.rom8.rescue.volunteer.dto.VolunteerRegisterRequest;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring", uses = ContactInfoMapper.class)
 public interface VolunteerMapper {
 
     @Mapping(target = "locationId", source = "location.id")
     VolunteerDto toDto(Volunteer volunteer);
+
+    List<VolunteerDto> toDtoList(List<Volunteer> volunteers);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createDate", ignore = true)
