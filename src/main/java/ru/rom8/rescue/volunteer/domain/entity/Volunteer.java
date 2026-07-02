@@ -13,6 +13,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +36,13 @@ public class Volunteer extends AbstractAuditableEntity {
 
     @Column(name = "patronymic", length = 100)
     private String patronymic;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender", nullable = false, length = 10)
+    private Gender gender;
+
+    @Column(name = "birth_date", nullable = false)
+    private LocalDate birthDate;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
