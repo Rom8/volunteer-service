@@ -57,6 +57,13 @@ public class VolunteerRegistrationService {
     }
 
     @Transactional(readOnly = true)
+    public VolunteerDto getById(Long id) {
+        Volunteer volunteer = volunteerRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE));
+        return volunteerMapper.toDto(volunteer);
+    }
+
+    @Transactional(readOnly = true)
     public List<VolunteerDto> getList(String settlementName, String settlementDistrictName, VolunteerStatus status) {
         return volunteerMapper.toDtoList(volunteerRepository.findByFilters(
                 normalizeFilter(settlementName),
