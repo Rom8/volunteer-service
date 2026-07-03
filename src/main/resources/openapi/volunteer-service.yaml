@@ -1,10 +1,10 @@
-openapi: 3.1.1
+openapi: 3.1.0
 info:
   title: Volunteer Service API
   description: API сервиса регистрации и управления волонтёрами.
   version: 0.0.1
 servers:
-  - url: /
+  - url: http://localhost:8080
 tags:
   - name: Volunteer
     description: API волонтёра

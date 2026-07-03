@@ -121,8 +121,10 @@ public class VolunteerRegistrationService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus toVolunteerStatus(VolunteerStatus status) {
-        return status == null ? null : ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus.valueOf(status.name());
+    private String toVolunteerStatus(VolunteerStatus status) {
+        return status == null
+                ? null
+                : status.name();
     }
 
     private void updatePersonalInfo(Volunteer volunteer, VolunteerUpdateRequest request) {

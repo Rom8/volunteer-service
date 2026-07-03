@@ -20,11 +20,11 @@ public interface VolunteerRepository extends JpaRepository<Volunteer, Long> {
                 left join location parent_location on parent_location.id = location.parent_loc_id
             where (:settlementName is null or location.name = :settlementName or parent_location.name = :settlementName)
               and (:settlementDistrictName is null or parent_location.id is not null and location.name = :settlementDistrictName)
-              and (:status is null or volunteer.status = cast(:status as varchar))
+              and (:status is null or volunteer.status = :status)
             """, nativeQuery = true)
     List<Volunteer> findByFilters(
             @Param("settlementName") String settlementName,
             @Param("settlementDistrictName") String settlementDistrictName,
-            @Param("status") VolunteerStatus status
+            @Param("status") String status
     );
 }
