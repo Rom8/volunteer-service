@@ -28,6 +28,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,12 +41,18 @@ class VolunteerControllerTest {
 
     private static final String POSTGRES_IMAGE = "postgres:17.10";
     private static final String BASE_URL = "/api/v1/volunteer";
+    private static final String ADMIN_BASE_URL = "/api/v1/admin/volunteer";
+    private static final String INTERNAL_BASE_URL = "/internal/api/v1/volunteer";
     private static final String REGISTER_ME_URL = BASE_URL + "/register/me";
     private static final String ME_URL = BASE_URL + "/me";
+    private static final String ADMIN_VOLUNTEER_LIST_URL = ADMIN_BASE_URL + "/list";
+    private static final String INTERNAL_VOLUNTEER_LIST_URL = INTERNAL_BASE_URL + "/list";
     private static final String USER_ID_HEADER = "X-USER-ID";
     private static final String REGISTER_REQUEST_FIXTURE = "/volunteer/register-request.json";
     private static final String UPDATE_REQUEST_FIXTURE = "/volunteer/update-request.json";
     private static final String CONTACT_VALUE_SEPARATOR = ":";
+    private static final String PHONE_NUMBER_FORMAT = "+7999001%04d";
+    private static final String EMAIL_FORMAT = "volunteer-%d@example.org";
 
     @Container
     @ServiceConnection
@@ -57,6 +65,8 @@ class VolunteerControllerTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    private final AtomicInteger testVolunteerCounter = new AtomicInteger();
 
     private Long registeredVolunteerId;
     private String registeredUserId;
@@ -115,7 +125,78 @@ class VolunteerControllerTest {
 
     @Test
     @Order(5)
-    @DisplayName("5. Удаление своей учётной записи волонтёра")
+    @DisplayName("5. Получение волонтёра администратором по идентификатору")
+    void shouldGetVolunteerByIdViaAdminRestEndpoint() throws Exception {
+        VolunteerRegisterRequest request = uniqueRegisterRequest();
+        VolunteerDto registeredVolunteer = registerVolunteer(request);
+
+        HttpResponse<String> response = httpClient.send(
+                requestBuilder(ADMIN_BASE_URL + "/" + registeredVolunteer.getId())
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value());
+        VolunteerDto volunteer = readVolunteer(response);
+        assertThat(volunteer.getId()).isEqualTo(registeredVolunteer.getId());
+        assertThat(volunteer.getUserId()).isEqualTo(registeredVolunteer.getUserId());
+        assertVolunteerMatchesRegistration(volunteer, request);
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("6. Получение списка волонтёров администратором с фильтрацией")
+    void shouldGetVolunteerListViaAdminRestEndpoint() throws Exception {
+        VolunteerRegisterRequest request = uniqueRegisterRequest();
+        VolunteerDto registeredVolunteer = registerVolunteer(request);
+
+        HttpResponse<String> response = httpClient.send(
+                requestBuilder(ADMIN_VOLUNTEER_LIST_URL
+                        + "?settlementName=" + request.getSettlementName()
+                        + "&status=" + VolunteerStatus.FREE)
+                        .GET()
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value());
+        List<VolunteerDto> volunteers = readVolunteerList(response);
+        assertThat(volunteers)
+                .extracting(VolunteerDto::getId)
+                .contains(registeredVolunteer.getId());
+        VolunteerDto volunteer = findVolunteer(volunteers, registeredVolunteer.getId());
+        assertVolunteerMatchesRegistration(volunteer, request);
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("7. Получение списка волонтёров внутренним API по идентификаторам")
+    void shouldGetVolunteerListByIdsViaInternalRestEndpoint() throws Exception {
+        VolunteerRegisterRequest firstRequest = uniqueRegisterRequest();
+        VolunteerRegisterRequest secondRequest = uniqueRegisterRequest();
+        VolunteerDto firstVolunteer = registerVolunteer(firstRequest);
+        VolunteerDto secondVolunteer = registerVolunteer(secondRequest);
+
+        HttpResponse<String> response = httpClient.send(
+                requestBuilder(INTERNAL_VOLUNTEER_LIST_URL)
+                        .POST(jsonBody(List.of(firstVolunteer.getId(), secondVolunteer.getId())))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value());
+        List<VolunteerDto> volunteers = readVolunteerList(response);
+        assertThat(volunteers)
+                .extracting(VolunteerDto::getId)
+                .containsExactlyInAnyOrder(firstVolunteer.getId(), secondVolunteer.getId());
+        assertVolunteerMatchesRegistration(findVolunteer(volunteers, firstVolunteer.getId()), firstRequest);
+        assertVolunteerMatchesRegistration(findVolunteer(volunteers, secondVolunteer.getId()), secondRequest);
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("8. Удаление своей учётной записи волонтёра")
     void shouldDeleteOwnRegistrationViaRestEndpoint() throws Exception {
         assertThat(registeredUserId).isNotBlank();
 
@@ -132,8 +213,10 @@ class VolunteerControllerTest {
     }
 
     private VolunteerDto registerVolunteer() throws Exception {
-        VolunteerRegisterRequest request = readRegisterRequestFixture();
+        return registerVolunteer(readRegisterRequestFixture());
+    }
 
+    private VolunteerDto registerVolunteer(VolunteerRegisterRequest request) throws Exception {
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(REGISTER_ME_URL)
                         .POST(jsonBody(request))
@@ -190,8 +273,28 @@ class VolunteerControllerTest {
         return objectMapper.readValue(response.body(), VolunteerDto.class);
     }
 
+    private List<VolunteerDto> readVolunteerList(HttpResponse<String> response) {
+        assertThat(response.body()).isNotBlank();
+        return List.of(objectMapper.readValue(response.body(), VolunteerDto[].class));
+    }
+
+    private VolunteerDto findVolunteer(List<VolunteerDto> volunteers, Long volunteerId) {
+        return volunteers.stream()
+                .filter(volunteer -> volunteerId.equals(volunteer.getId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Volunteer not found in response: " + volunteerId));
+    }
+
     private VolunteerRegisterRequest readRegisterRequestFixture() throws Exception {
         return readJsonFixture(REGISTER_REQUEST_FIXTURE, VolunteerRegisterRequest.class);
+    }
+
+    private VolunteerRegisterRequest uniqueRegisterRequest() throws Exception {
+        VolunteerRegisterRequest request = readRegisterRequestFixture();
+        int sequence = testVolunteerCounter.incrementAndGet();
+        request.setPhoneNumber(PHONE_NUMBER_FORMAT.formatted(sequence));
+        request.setEmail(EMAIL_FORMAT.formatted(sequence));
+        return request;
     }
 
     private VolunteerUpdateRequest readUpdateRequestFixture() throws Exception {
@@ -208,8 +311,10 @@ class VolunteerControllerTest {
     }
 
     private void assertVolunteerMatchesRegistration(VolunteerDto volunteer) throws Exception {
-        VolunteerRegisterRequest expected = readRegisterRequestFixture();
+        assertVolunteerMatchesRegistration(volunteer, readRegisterRequestFixture());
+    }
 
+    private void assertVolunteerMatchesRegistration(VolunteerDto volunteer, VolunteerRegisterRequest expected) {
         assertVolunteerPersonalData(
                 volunteer,
                 expected.getFirstName(),
