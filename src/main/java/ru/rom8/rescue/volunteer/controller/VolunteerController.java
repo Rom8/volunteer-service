@@ -3,9 +3,9 @@ package ru.rom8.rescue.volunteer.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.RestController;
 import ru.rom8.rescue.volunteer.api.VolunteerApi;
-import ru.rom8.rescue.volunteer.api.model.VolunteerDtoApi;
-import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequestApi;
-import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequestApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerDto;
+import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequest;
+import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequest;
 import ru.rom8.rescue.volunteer.service.VolunteerRegistrationService;
 
 @RestController
@@ -15,18 +15,18 @@ public class VolunteerController implements VolunteerApi {
     private final VolunteerRegistrationService volunteerRegistrationService;
 
     @Override
-    public VolunteerDtoApi registerMe(VolunteerRegisterRequestApi volunteerRegisterRequestApi) {
-        return volunteerRegistrationService.register(volunteerRegisterRequestApi);
+    public VolunteerDto registerMe(VolunteerRegisterRequest volunteerRegisterRequest) {
+        return volunteerRegistrationService.register(volunteerRegisterRequest);
     }
 
     @Override
-    public VolunteerDtoApi getMe(String xUserId) {
+    public VolunteerDto getMe(String xUserId) {
         return volunteerRegistrationService.getByUserId(xUserId);
     }
 
     @Override
-    public VolunteerDtoApi updateMe(String xUserId, VolunteerUpdateRequestApi volunteerUpdateRequestApi) {
-        return volunteerRegistrationService.updateByUserId(xUserId, volunteerUpdateRequestApi);
+    public VolunteerDto updateMe(String xUserId, VolunteerUpdateRequest volunteerUpdateRequest) {
+        return volunteerRegistrationService.updateByUserId(xUserId, volunteerUpdateRequest);
     }
 
     @Override

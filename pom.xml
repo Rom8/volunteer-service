@@ -129,7 +129,6 @@
                             <generatorName>spring</generatorName>
                             <apiPackage>ru.rom8.rescue.volunteer.api</apiPackage>
                             <modelPackage>ru.rom8.rescue.volunteer.api.model</modelPackage>
-                            <modelNameSuffix>Api</modelNameSuffix>
                             <generateSupportingFiles>false</generateSupportingFiles>
                             <configOptions>
                                 <interfaceOnly>true</interfaceOnly>

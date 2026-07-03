@@ -6,16 +6,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
+import ru.rom8.rescue.volunteer.api.model.VolunteerDto;
+import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequest;
+import ru.rom8.rescue.volunteer.api.model.VolunteerStatus;
+import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequest;
 import ru.rom8.rescue.volunteer.domain.entity.ContactInfo;
 import ru.rom8.rescue.volunteer.domain.entity.ContactType;
 import ru.rom8.rescue.volunteer.domain.entity.Location;
 import ru.rom8.rescue.volunteer.domain.entity.LocationKind;
-import ru.rom8.rescue.volunteer.api.model.VolunteerDtoApi;
-import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequestApi;
-import ru.rom8.rescue.volunteer.api.model.VolunteerStatusApi;
-import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequestApi;
 import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
-import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
 import ru.rom8.rescue.volunteer.mapper.VolunteerMapper;
 import ru.rom8.rescue.volunteer.repository.ContactInfoRepository;
 import ru.rom8.rescue.volunteer.repository.LocationRepository;
@@ -40,7 +39,7 @@ public class VolunteerRegistrationService {
     private final VolunteerMapper volunteerMapper;
 
     @Transactional
-    public VolunteerDtoApi register(VolunteerRegisterRequestApi request) {
+    public VolunteerDto register(VolunteerRegisterRequest request) {
         Location location = resolveLocation(request.getSettlementName(), request.getSettlementDistrictName());
 
         Volunteer volunteer = volunteerMapper.toEntity(request);
@@ -55,19 +54,19 @@ public class VolunteerRegistrationService {
     }
 
     @Transactional(readOnly = true)
-    public VolunteerDtoApi getByUserId(String userId) {
+    public VolunteerDto getByUserId(String userId) {
         return volunteerMapper.toDto(getVolunteerByUserId(userId));
     }
 
     @Transactional(readOnly = true)
-    public VolunteerDtoApi getById(Long id) {
+    public VolunteerDto getById(Long id) {
         Volunteer volunteer = volunteerRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE));
         return volunteerMapper.toDto(volunteer);
     }
 
     @Transactional(readOnly = true)
-    public List<VolunteerDtoApi> getList(String settlementName, String settlementDistrictName, VolunteerStatusApi status) {
+    public List<VolunteerDto> getList(String settlementName, String settlementDistrictName, VolunteerStatus status) {
         return volunteerMapper.toDtoList(volunteerRepository.findByFilters(
                 normalizeFilter(settlementName),
                 normalizeFilter(settlementDistrictName),
@@ -76,7 +75,7 @@ public class VolunteerRegistrationService {
     }
 
     @Transactional(readOnly = true)
-    public List<VolunteerDtoApi> getByIds(List<Long> ids) {
+    public List<VolunteerDto> getByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
         }
@@ -93,7 +92,7 @@ public class VolunteerRegistrationService {
     }
 
     @Transactional
-    public VolunteerDtoApi updateByUserId(String userId, VolunteerUpdateRequestApi request) {
+    public VolunteerDto updateByUserId(String userId, VolunteerUpdateRequest request) {
         Volunteer volunteer = getVolunteerByUserId(userId);
 
         updatePersonalInfo(volunteer, request);
@@ -122,11 +121,11 @@ public class VolunteerRegistrationService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private VolunteerStatus toVolunteerStatus(VolunteerStatusApi status) {
-        return status == null ? null : VolunteerStatus.valueOf(status.name());
+    private ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus toVolunteerStatus(VolunteerStatus status) {
+        return status == null ? null : ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus.valueOf(status.name());
     }
 
-    private void updatePersonalInfo(Volunteer volunteer, VolunteerUpdateRequestApi request) {
+    private void updatePersonalInfo(Volunteer volunteer, VolunteerUpdateRequest request) {
         if (StringUtils.hasText(request.getFamilyName())) {
             volunteer.setFamilyName(request.getFamilyName().trim());
         }
@@ -138,7 +137,7 @@ public class VolunteerRegistrationService {
         }
     }
 
-    private void updateLocation(Volunteer volunteer, VolunteerUpdateRequestApi request) {
+    private void updateLocation(Volunteer volunteer, VolunteerUpdateRequest request) {
         if (request.getSettlementName() == null && request.getSettlementDistrictName() == null) {
             return;
         }
