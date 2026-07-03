@@ -1,0 +1,11 @@
+{
+  "familyName": "Иванов",
+  "firstName": "Иван",
+  "patronymic": "Иванович",
+  "gender": "MALE",
+  "phoneNumber": "+79990000001",
+  "email": "ivan.volunteer@example.org",
+  "birthDate": "1990-01-15",
+  "settlementName": "Москва",
+  "districtName": "Центральный"
+}

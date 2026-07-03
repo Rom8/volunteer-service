@@ -16,17 +16,16 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.rom8.rescue.volunteer.domain.entity.ContactType;
-import ru.rom8.rescue.volunteer.domain.entity.Gender;
 import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
 import ru.rom8.rescue.volunteer.dto.VolunteerDto;
 import ru.rom8.rescue.volunteer.dto.VolunteerRegisterRequest;
 import ru.rom8.rescue.volunteer.dto.VolunteerUpdateRequest;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,23 +40,8 @@ class VolunteerControllerTest {
     private static final String REGISTER_ME_URL = BASE_URL + "/register/me";
     private static final String ME_URL = BASE_URL + "/me";
     private static final String USER_ID_HEADER = "X-USER-ID";
-
-    private static final String INITIAL_FAMILY_NAME = "Иванов";
-    private static final String INITIAL_FIRST_NAME = "Иван";
-    private static final String INITIAL_PATRONYMIC = "Иванович";
-    private static final String INITIAL_PHONE_NUMBER = "+79990000001";
-    private static final String INITIAL_EMAIL = "ivan.volunteer@example.org";
-    private static final LocalDate INITIAL_BIRTH_DATE = LocalDate.of(1990, 1, 15);
-    private static final String INITIAL_SETTLEMENT_NAME = "Москва";
-    private static final String INITIAL_DISTRICT_NAME = "Центральный";
-
-    private static final String UPDATED_FAMILY_NAME = "Петров";
-    private static final String UPDATED_FIRST_NAME = "Пётр";
-    private static final String UPDATED_PATRONYMIC = "Петрович";
-    private static final String UPDATED_PHONE_NUMBER = "+79990000002";
-    private static final String UPDATED_EMAIL = "petr.volunteer@example.org";
-    private static final String UPDATED_SETTLEMENT_NAME = "Санкт-Петербург";
-    private static final String UPDATED_DISTRICT_NAME = "Адмиралтейский";
+    private static final String REGISTER_REQUEST_FIXTURE = "/volunteer/register-request.json";
+    private static final String UPDATE_REQUEST_FIXTURE = "/volunteer/update-request.json";
 
     @Container
     @ServiceConnection
@@ -145,17 +129,7 @@ class VolunteerControllerTest {
     }
 
     private VolunteerDto registerVolunteer() throws Exception {
-        VolunteerRegisterRequest request = new VolunteerRegisterRequest(
-                INITIAL_FAMILY_NAME,
-                INITIAL_FIRST_NAME,
-                INITIAL_PATRONYMIC,
-                Gender.MALE,
-                INITIAL_PHONE_NUMBER,
-                INITIAL_EMAIL,
-                INITIAL_BIRTH_DATE,
-                INITIAL_SETTLEMENT_NAME,
-                INITIAL_DISTRICT_NAME
-        );
+        VolunteerRegisterRequest request = readRegisterRequestFixture();
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(REGISTER_ME_URL)
@@ -185,15 +159,7 @@ class VolunteerControllerTest {
     }
 
     private VolunteerDto updateVolunteer(String userId) throws Exception {
-        VolunteerUpdateRequest request = new VolunteerUpdateRequest(
-                UPDATED_FAMILY_NAME,
-                UPDATED_FIRST_NAME,
-                UPDATED_PATRONYMIC,
-                UPDATED_PHONE_NUMBER,
-                UPDATED_EMAIL,
-                UPDATED_SETTLEMENT_NAME,
-                UPDATED_DISTRICT_NAME
-        );
+        VolunteerUpdateRequest request = readUpdateRequestFixture();
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(ME_URL)
@@ -212,46 +178,68 @@ class VolunteerControllerTest {
                 .header("Content-Type", "application/json");
     }
 
-    private HttpRequest.BodyPublisher jsonBody(Object body) throws Exception {
+    private HttpRequest.BodyPublisher jsonBody(Object body) {
         return HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body));
     }
 
-    private VolunteerDto readVolunteer(HttpResponse<String> response) throws Exception {
+    private VolunteerDto readVolunteer(HttpResponse<String> response) {
         assertThat(response.body()).isNotBlank();
         return objectMapper.readValue(response.body(), VolunteerDto.class);
     }
 
-    private void assertVolunteerMatchesRegistration(VolunteerDto volunteer) {
-        assertThat(volunteer.firstName()).isEqualTo(INITIAL_FIRST_NAME);
-        assertThat(volunteer.familyName()).isEqualTo(INITIAL_FAMILY_NAME);
-        assertThat(volunteer.patronymic()).isEqualTo(INITIAL_PATRONYMIC);
-        assertThat(volunteer.gender()).isEqualTo(Gender.MALE);
-        assertThat(volunteer.birthDate()).isEqualTo(INITIAL_BIRTH_DATE);
+    private VolunteerRegisterRequest readRegisterRequestFixture() throws Exception {
+        return readJsonFixture(REGISTER_REQUEST_FIXTURE, VolunteerRegisterRequest.class);
+    }
+
+    private VolunteerUpdateRequest readUpdateRequestFixture() throws Exception {
+        return readJsonFixture(UPDATE_REQUEST_FIXTURE, VolunteerUpdateRequest.class);
+    }
+
+    private <T> T readJsonFixture(String resourcePath, Class<T> type) throws Exception {
+        try (InputStream inputStream = getClass().getResourceAsStream(resourcePath)) {
+            assertThat(inputStream)
+                    .as("JSON fixture %s must exist", resourcePath)
+                    .isNotNull();
+            return objectMapper.readValue(inputStream, type);
+        }
+    }
+
+    private void assertVolunteerMatchesRegistration(VolunteerDto volunteer) throws Exception {
+        VolunteerRegisterRequest expected = readRegisterRequestFixture();
+
+        assertThat(volunteer.firstName()).isEqualTo(expected.firstName());
+        assertThat(volunteer.familyName()).isEqualTo(expected.familyName());
+        assertThat(volunteer.patronymic()).isEqualTo(expected.patronymic());
+        assertThat(volunteer.gender()).isEqualTo(expected.gender());
+        assertThat(volunteer.birthDate()).isEqualTo(expected.birthDate());
         assertThat(volunteer.status()).isEqualTo(VolunteerStatus.FREE);
         assertThat(volunteer.locationId()).isNotNull();
         assertThat(volunteer.currentIncidentId()).isNull();
         assertThat(volunteer.contacts())
                 .extracting(contact -> contact.contactType() + ":" + contact.contact())
                 .containsExactlyInAnyOrder(
-                        ContactType.PHONE + ":" + INITIAL_PHONE_NUMBER,
-                        ContactType.EMAIL + ":" + INITIAL_EMAIL
+                        ContactType.PHONE + ":" + expected.phoneNumber(),
+                        ContactType.EMAIL + ":" + expected.email()
                 );
     }
 
-    private void assertVolunteerMatchesUpdate(VolunteerDto volunteer) {
-        assertThat(volunteer.firstName()).isEqualTo(UPDATED_FIRST_NAME);
-        assertThat(volunteer.familyName()).isEqualTo(UPDATED_FAMILY_NAME);
-        assertThat(volunteer.patronymic()).isEqualTo(UPDATED_PATRONYMIC);
-        assertThat(volunteer.gender()).isEqualTo(Gender.MALE);
-        assertThat(volunteer.birthDate()).isEqualTo(INITIAL_BIRTH_DATE);
+    private void assertVolunteerMatchesUpdate(VolunteerDto volunteer) throws Exception {
+        VolunteerRegisterRequest registration = readRegisterRequestFixture();
+        VolunteerUpdateRequest expected = readUpdateRequestFixture();
+
+        assertThat(volunteer.firstName()).isEqualTo(expected.firstName());
+        assertThat(volunteer.familyName()).isEqualTo(expected.familyName());
+        assertThat(volunteer.patronymic()).isEqualTo(expected.patronymic());
+        assertThat(volunteer.gender()).isEqualTo(registration.gender());
+        assertThat(volunteer.birthDate()).isEqualTo(registration.birthDate());
         assertThat(volunteer.status()).isEqualTo(VolunteerStatus.FREE);
         assertThat(volunteer.locationId()).isNotNull();
         assertThat(volunteer.currentIncidentId()).isNull();
         assertThat(volunteer.contacts())
                 .extracting(contact -> contact.contactType() + ":" + contact.contact())
                 .containsExactlyInAnyOrder(
-                        ContactType.PHONE + ":" + UPDATED_PHONE_NUMBER,
-                        ContactType.EMAIL + ":" + UPDATED_EMAIL
+                        ContactType.PHONE + ":" + expected.phoneNumber(),
+                        ContactType.EMAIL + ":" + expected.email()
                 );
     }
 }
