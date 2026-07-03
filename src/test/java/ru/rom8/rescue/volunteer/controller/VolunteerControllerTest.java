@@ -1,7 +1,12 @@
 package ru.rom8.rescue.volunteer.controller;
 
 import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -26,6 +31,8 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class VolunteerControllerTest {
 
@@ -64,36 +71,77 @@ class VolunteerControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    private Long registeredVolunteerId;
+    private String registeredUserId;
+
     @Test
-    void shouldRegisterViewUpdateViewAndDeleteVolunteerViaRestEndpoints() throws Exception {
+    @Order(1)
+    @DisplayName("1. Регистрация волонтёра")
+    void shouldRegisterVolunteerViaRestEndpoint() throws Exception {
         VolunteerDto registeredVolunteer = registerVolunteer();
-        String userId = registeredVolunteer.userId();
 
-        assertThat(userId).startsWith("volunteer-");
+        registeredVolunteerId = registeredVolunteer.id();
+        registeredUserId = registeredVolunteer.userId();
+
+        assertThat(registeredUserId).startsWith("volunteer-");
         assertVolunteerMatchesRegistration(registeredVolunteer);
+    }
 
-        VolunteerDto volunteerBeforeUpdate = getVolunteer(userId, HttpStatus.OK);
-        assertThat(volunteerBeforeUpdate.id()).isEqualTo(registeredVolunteer.id());
+    @Test
+    @Order(2)
+    @DisplayName("2. Просмотр данных о своей регистрации")
+    void shouldViewOwnRegistrationViaRestEndpoint() throws Exception {
+        assertThat(registeredVolunteerId).isNotNull();
+        assertThat(registeredUserId).isNotBlank();
+
+        VolunteerDto volunteerBeforeUpdate = getVolunteer(registeredUserId, HttpStatus.OK);
+
+        assertThat(volunteerBeforeUpdate.id()).isEqualTo(registeredVolunteerId);
         assertVolunteerMatchesRegistration(volunteerBeforeUpdate);
+    }
 
-        VolunteerDto updatedVolunteer = updateVolunteer(userId);
-        assertThat(updatedVolunteer.id()).isEqualTo(registeredVolunteer.id());
+    @Test
+    @Order(3)
+    @DisplayName("3. Обновление данных о себе")
+    void shouldUpdateOwnRegistrationViaRestEndpoint() throws Exception {
+        assertThat(registeredVolunteerId).isNotNull();
+        assertThat(registeredUserId).isNotBlank();
+
+        VolunteerDto updatedVolunteer = updateVolunteer(registeredUserId);
+
+        assertThat(updatedVolunteer.id()).isEqualTo(registeredVolunteerId);
         assertVolunteerMatchesUpdate(updatedVolunteer);
+    }
 
-        VolunteerDto volunteerAfterUpdate = getVolunteer(userId, HttpStatus.OK);
-        assertThat(volunteerAfterUpdate.id()).isEqualTo(registeredVolunteer.id());
+    @Test
+    @Order(4)
+    @DisplayName("4. Просмотр обновлённых данных о своей регистрации")
+    void shouldViewUpdatedOwnRegistrationViaRestEndpoint() throws Exception {
+        assertThat(registeredVolunteerId).isNotNull();
+        assertThat(registeredUserId).isNotBlank();
+
+        VolunteerDto volunteerAfterUpdate = getVolunteer(registeredUserId, HttpStatus.OK);
+
+        assertThat(volunteerAfterUpdate.id()).isEqualTo(registeredVolunteerId);
         assertVolunteerMatchesUpdate(volunteerAfterUpdate);
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("5. Удаление своей учётной записи волонтёра")
+    void shouldDeleteOwnRegistrationViaRestEndpoint() throws Exception {
+        assertThat(registeredUserId).isNotBlank();
 
         HttpResponse<String> deleteResponse = httpClient.send(
                 requestBuilder(ME_URL)
-                        .header(USER_ID_HEADER, userId)
+                        .header(USER_ID_HEADER, registeredUserId)
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString()
         );
         assertThat(deleteResponse.statusCode()).isEqualTo(HttpStatus.NO_CONTENT.value());
 
-        getVolunteer(userId, HttpStatus.NOT_FOUND);
+        getVolunteer(registeredUserId, HttpStatus.NOT_FOUND);
     }
 
     private VolunteerDto registerVolunteer() throws Exception {
