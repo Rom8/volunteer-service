@@ -10,11 +10,12 @@ import ru.rom8.rescue.volunteer.domain.entity.ContactInfo;
 import ru.rom8.rescue.volunteer.domain.entity.ContactType;
 import ru.rom8.rescue.volunteer.domain.entity.Location;
 import ru.rom8.rescue.volunteer.domain.entity.LocationKind;
+import ru.rom8.rescue.volunteer.api.model.VolunteerDtoApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequestApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerStatusApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequestApi;
 import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
 import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
-import ru.rom8.rescue.volunteer.dto.VolunteerDto;
-import ru.rom8.rescue.volunteer.dto.VolunteerRegisterRequest;
-import ru.rom8.rescue.volunteer.dto.VolunteerUpdateRequest;
 import ru.rom8.rescue.volunteer.mapper.VolunteerMapper;
 import ru.rom8.rescue.volunteer.repository.ContactInfoRepository;
 import ru.rom8.rescue.volunteer.repository.LocationRepository;
@@ -39,43 +40,43 @@ public class VolunteerRegistrationService {
     private final VolunteerMapper volunteerMapper;
 
     @Transactional
-    public VolunteerDto register(VolunteerRegisterRequest request) {
-        Location location = resolveLocation(request.settlementName(), request.settlementDistrictName());
+    public VolunteerDtoApi register(VolunteerRegisterRequestApi request) {
+        Location location = resolveLocation(request.getSettlementName(), request.getSettlementDistrictName());
 
         Volunteer volunteer = volunteerMapper.toEntity(request);
         volunteer.setUserId(generateUserId());  //todo надо ли это?
         volunteer.setLocation(location);
 
         Volunteer savedVolunteer = volunteerRepository.save(volunteer);
-        savedVolunteer.getContacts().add(createContact(savedVolunteer, request.phoneNumber(), ContactType.PHONE));
-        savedVolunteer.getContacts().add(createContact(savedVolunteer, request.email(), ContactType.EMAIL));
+        savedVolunteer.getContacts().add(createContact(savedVolunteer, request.getPhoneNumber(), ContactType.PHONE));
+        savedVolunteer.getContacts().add(createContact(savedVolunteer, request.getEmail(), ContactType.EMAIL));
 
         return volunteerMapper.toDto(savedVolunteer);
     }
 
     @Transactional(readOnly = true)
-    public VolunteerDto getByUserId(String userId) {
+    public VolunteerDtoApi getByUserId(String userId) {
         return volunteerMapper.toDto(getVolunteerByUserId(userId));
     }
 
     @Transactional(readOnly = true)
-    public VolunteerDto getById(Long id) {
+    public VolunteerDtoApi getById(Long id) {
         Volunteer volunteer = volunteerRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE));
         return volunteerMapper.toDto(volunteer);
     }
 
     @Transactional(readOnly = true)
-    public List<VolunteerDto> getList(String settlementName, String settlementDistrictName, VolunteerStatus status) {
+    public List<VolunteerDtoApi> getList(String settlementName, String settlementDistrictName, VolunteerStatusApi status) {
         return volunteerMapper.toDtoList(volunteerRepository.findByFilters(
                 normalizeFilter(settlementName),
                 normalizeFilter(settlementDistrictName),
-                status
+                toVolunteerStatus(status)
         ));
     }
 
     @Transactional(readOnly = true)
-    public List<VolunteerDto> getByIds(List<Long> ids) {
+    public List<VolunteerDtoApi> getByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
         }
@@ -92,13 +93,13 @@ public class VolunteerRegistrationService {
     }
 
     @Transactional
-    public VolunteerDto updateByUserId(String userId, VolunteerUpdateRequest request) {
+    public VolunteerDtoApi updateByUserId(String userId, VolunteerUpdateRequestApi request) {
         Volunteer volunteer = getVolunteerByUserId(userId);
 
         updatePersonalInfo(volunteer, request);
         updateLocation(volunteer, request);
-        updateContact(volunteer, request.phoneNumber(), ContactType.PHONE);
-        updateContact(volunteer, request.email(), ContactType.EMAIL);
+        updateContact(volunteer, request.getPhoneNumber(), ContactType.PHONE);
+        updateContact(volunteer, request.getEmail(), ContactType.EMAIL);
 
         return volunteerMapper.toDto(volunteerRepository.save(volunteer));
     }
@@ -121,29 +122,33 @@ public class VolunteerRegistrationService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private void updatePersonalInfo(Volunteer volunteer, VolunteerUpdateRequest request) {
-        if (StringUtils.hasText(request.familyName())) {
-            volunteer.setFamilyName(request.familyName().trim());
+    private VolunteerStatus toVolunteerStatus(VolunteerStatusApi status) {
+        return status == null ? null : VolunteerStatus.valueOf(status.name());
+    }
+
+    private void updatePersonalInfo(Volunteer volunteer, VolunteerUpdateRequestApi request) {
+        if (StringUtils.hasText(request.getFamilyName())) {
+            volunteer.setFamilyName(request.getFamilyName().trim());
         }
-        if (StringUtils.hasText(request.firstName())) {
-            volunteer.setFirstName(request.firstName().trim());
+        if (StringUtils.hasText(request.getFirstName())) {
+            volunteer.setFirstName(request.getFirstName().trim());
         }
-        if (request.patronymic() != null) {
-            volunteer.setPatronymic(StringUtils.hasText(request.patronymic()) ? request.patronymic().trim() : null);
+        if (request.getPatronymic() != null) {
+            volunteer.setPatronymic(StringUtils.hasText(request.getPatronymic()) ? request.getPatronymic().trim() : null);
         }
     }
 
-    private void updateLocation(Volunteer volunteer, VolunteerUpdateRequest request) {
-        if (request.settlementName() == null && request.settlementDistrictName() == null) {
+    private void updateLocation(Volunteer volunteer, VolunteerUpdateRequestApi request) {
+        if (request.getSettlementName() == null && request.getSettlementDistrictName() == null) {
             return;
         }
 
-        String settlementName = StringUtils.hasText(request.settlementName())
-                ? request.settlementName().trim()
+        String settlementName = StringUtils.hasText(request.getSettlementName())
+                ? request.getSettlementName().trim()
                 : getCurrentSettlementName(volunteer);
-        String districtName = request.settlementDistrictName() == null
+        String districtName = request.getSettlementDistrictName() == null
                 ? getCurrentDistrictName(volunteer)
-                : request.settlementDistrictName().trim();
+                : request.getSettlementDistrictName().trim();
 
         volunteer.setLocation(resolveLocation(settlementName, districtName));
     }

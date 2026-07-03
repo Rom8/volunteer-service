@@ -12,15 +12,15 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import ru.rom8.rescue.volunteer.domain.entity.ContactType;
-import ru.rom8.rescue.volunteer.domain.entity.Gender;
-import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
-import ru.rom8.rescue.volunteer.dto.VolunteerDto;
-import ru.rom8.rescue.volunteer.dto.VolunteerRegisterRequest;
-import ru.rom8.rescue.volunteer.dto.VolunteerUpdateRequest;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import ru.rom8.rescue.volunteer.api.model.ContactTypeApi;
+import ru.rom8.rescue.volunteer.api.model.GenderApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerDtoApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequestApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerStatusApi;
+import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequestApi;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -65,10 +65,10 @@ class VolunteerControllerTest {
     @Order(1)
     @DisplayName("1. Регистрация волонтёра")
     void shouldRegisterVolunteerViaRestEndpoint() throws Exception {
-        VolunteerDto volunteer = registerVolunteer();
+        VolunteerDtoApi volunteer = registerVolunteer();
 
-        registeredVolunteerId = volunteer.id();
-        registeredUserId = volunteer.userId();
+        registeredVolunteerId = volunteer.getId();
+        registeredUserId = volunteer.getUserId();
 
         assertThat(registeredUserId).startsWith("volunteer-");
         assertVolunteerMatchesRegistration(volunteer);
@@ -81,9 +81,9 @@ class VolunteerControllerTest {
         assertThat(registeredVolunteerId).isNotNull();
         assertThat(registeredUserId).isNotBlank();
 
-        VolunteerDto volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
+        VolunteerDtoApi volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
 
-        assertThat(volunteer.id()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
         assertVolunteerMatchesRegistration(volunteer);
     }
 
@@ -94,9 +94,9 @@ class VolunteerControllerTest {
         assertThat(registeredVolunteerId).isNotNull();
         assertThat(registeredUserId).isNotBlank();
 
-        VolunteerDto volunteer = updateVolunteer(registeredUserId);
+        VolunteerDtoApi volunteer = updateVolunteer(registeredUserId);
 
-        assertThat(volunteer.id()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
         assertVolunteerMatchesUpdate(volunteer);
     }
 
@@ -107,9 +107,9 @@ class VolunteerControllerTest {
         assertThat(registeredVolunteerId).isNotNull();
         assertThat(registeredUserId).isNotBlank();
 
-        VolunteerDto volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
+        VolunteerDtoApi volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
 
-        assertThat(volunteer.id()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
         assertVolunteerMatchesUpdate(volunteer);
     }
 
@@ -131,8 +131,8 @@ class VolunteerControllerTest {
         getVolunteer(registeredUserId, HttpStatus.NOT_FOUND);
     }
 
-    private VolunteerDto registerVolunteer() throws Exception {
-        VolunteerRegisterRequest request = readRegisterRequestFixture();
+    private VolunteerDtoApi registerVolunteer() throws Exception {
+        VolunteerRegisterRequestApi request = readRegisterRequestFixture();
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(REGISTER_ME_URL)
@@ -145,7 +145,7 @@ class VolunteerControllerTest {
         return readVolunteer(response);
     }
 
-    private VolunteerDto getVolunteer(String userId, HttpStatus expectedStatus) throws Exception {
+    private VolunteerDtoApi getVolunteer(String userId, HttpStatus expectedStatus) throws Exception {
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(ME_URL)
                         .header(USER_ID_HEADER, userId)
@@ -161,8 +161,8 @@ class VolunteerControllerTest {
         return readVolunteer(response);
     }
 
-    private VolunteerDto updateVolunteer(String userId) throws Exception {
-        VolunteerUpdateRequest request = readUpdateRequestFixture();
+    private VolunteerDtoApi updateVolunteer(String userId) throws Exception {
+        VolunteerUpdateRequestApi request = readUpdateRequestFixture();
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(ME_URL)
@@ -185,17 +185,17 @@ class VolunteerControllerTest {
         return HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body));
     }
 
-    private VolunteerDto readVolunteer(HttpResponse<String> response) {
+    private VolunteerDtoApi readVolunteer(HttpResponse<String> response) {
         assertThat(response.body()).isNotBlank();
-        return objectMapper.readValue(response.body(), VolunteerDto.class);
+        return objectMapper.readValue(response.body(), VolunteerDtoApi.class);
     }
 
-    private VolunteerRegisterRequest readRegisterRequestFixture() throws Exception {
-        return readJsonFixture(REGISTER_REQUEST_FIXTURE, VolunteerRegisterRequest.class);
+    private VolunteerRegisterRequestApi readRegisterRequestFixture() throws Exception {
+        return readJsonFixture(REGISTER_REQUEST_FIXTURE, VolunteerRegisterRequestApi.class);
     }
 
-    private VolunteerUpdateRequest readUpdateRequestFixture() throws Exception {
-        return readJsonFixture(UPDATE_REQUEST_FIXTURE, VolunteerUpdateRequest.class);
+    private VolunteerUpdateRequestApi readUpdateRequestFixture() throws Exception {
+        return readJsonFixture(UPDATE_REQUEST_FIXTURE, VolunteerUpdateRequestApi.class);
     }
 
     private <T> T readJsonFixture(String resourcePath, Class<T> type) throws Exception {
@@ -207,64 +207,64 @@ class VolunteerControllerTest {
         }
     }
 
-    private void assertVolunteerMatchesRegistration(VolunteerDto volunteer) throws Exception {
-        VolunteerRegisterRequest expected = readRegisterRequestFixture();
+    private void assertVolunteerMatchesRegistration(VolunteerDtoApi volunteer) throws Exception {
+        VolunteerRegisterRequestApi expected = readRegisterRequestFixture();
 
         assertVolunteerPersonalData(
                 volunteer,
-                expected.firstName(),
-                expected.familyName(),
-                expected.patronymic(),
-                expected.gender(),
-                expected.birthDate()
+                expected.getFirstName(),
+                expected.getFamilyName(),
+                expected.getPatronymic(),
+                expected.getGender(),
+                expected.getBirthDate()
         );
         assertVolunteerCommonState(volunteer);
-        assertVolunteerContacts(volunteer, expected.phoneNumber(), expected.email());
+        assertVolunteerContacts(volunteer, expected.getPhoneNumber(), expected.getEmail());
     }
 
-    private void assertVolunteerMatchesUpdate(VolunteerDto volunteer) throws Exception {
-        VolunteerRegisterRequest registration = readRegisterRequestFixture();
-        VolunteerUpdateRequest expected = readUpdateRequestFixture();
+    private void assertVolunteerMatchesUpdate(VolunteerDtoApi volunteer) throws Exception {
+        VolunteerRegisterRequestApi registration = readRegisterRequestFixture();
+        VolunteerUpdateRequestApi expected = readUpdateRequestFixture();
 
         assertVolunteerPersonalData(
                 volunteer,
-                expected.firstName(),
-                expected.familyName(),
-                expected.patronymic(),
-                registration.gender(),
-                registration.birthDate()
+                expected.getFirstName(),
+                expected.getFamilyName(),
+                expected.getPatronymic(),
+                registration.getGender(),
+                registration.getBirthDate()
         );
         assertVolunteerCommonState(volunteer);
-        assertVolunteerContacts(volunteer, expected.phoneNumber(), expected.email());
+        assertVolunteerContacts(volunteer, expected.getPhoneNumber(), expected.getEmail());
     }
 
     private void assertVolunteerPersonalData(
-            VolunteerDto volunteer,
+            VolunteerDtoApi volunteer,
             String expectedFirstName,
             String expectedFamilyName,
             String expectedPatronymic,
-            Gender expectedGender,
+            GenderApi expectedGender,
             LocalDate expectedBirthDate
     ) {
-        assertThat(volunteer.firstName()).isEqualTo(expectedFirstName);
-        assertThat(volunteer.familyName()).isEqualTo(expectedFamilyName);
-        assertThat(volunteer.patronymic()).isEqualTo(expectedPatronymic);
-        assertThat(volunteer.gender()).isEqualTo(expectedGender);
-        assertThat(volunteer.birthDate()).isEqualTo(expectedBirthDate);
+        assertThat(volunteer.getFirstName()).isEqualTo(expectedFirstName);
+        assertThat(volunteer.getFamilyName()).isEqualTo(expectedFamilyName);
+        assertThat(volunteer.getPatronymic()).isEqualTo(expectedPatronymic);
+        assertThat(volunteer.getGender()).isEqualTo(expectedGender);
+        assertThat(volunteer.getBirthDate()).isEqualTo(expectedBirthDate);
     }
 
-    private void assertVolunteerCommonState(VolunteerDto volunteer) {
-        assertThat(volunteer.status()).isEqualTo(VolunteerStatus.FREE);
-        assertThat(volunteer.locationId()).isNotNull();
-        assertThat(volunteer.currentIncidentId()).isNull();
+    private void assertVolunteerCommonState(VolunteerDtoApi volunteer) {
+        assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatusApi.FREE);
+        assertThat(volunteer.getLocationId()).isNotNull();
+        assertThat(volunteer.getCurrentIncidentId()).isNull();
     }
 
-    private void assertVolunteerContacts(VolunteerDto volunteer, String expectedPhoneNumber, String expectedEmail) {
-        assertThat(volunteer.contacts())
-                .extracting(contact -> contact.contactType() + CONTACT_VALUE_SEPARATOR + contact.contact())
+    private void assertVolunteerContacts(VolunteerDtoApi volunteer, String expectedPhoneNumber, String expectedEmail) {
+        assertThat(volunteer.getContacts())
+                .extracting(contact -> contact.getContactType() + CONTACT_VALUE_SEPARATOR + contact.getContact())
                 .containsExactlyInAnyOrder(
-                        ContactType.PHONE + CONTACT_VALUE_SEPARATOR + expectedPhoneNumber,
-                        ContactType.EMAIL + CONTACT_VALUE_SEPARATOR + expectedEmail
+                        ContactTypeApi.PHONE + CONTACT_VALUE_SEPARATOR + expectedPhoneNumber,
+                        ContactTypeApi.EMAIL + CONTACT_VALUE_SEPARATOR + expectedEmail
                 );
     }
 }
