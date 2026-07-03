@@ -12,10 +12,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import ru.rom8.rescue.volunteer.domain.entity.ContactType;
+import ru.rom8.rescue.volunteer.domain.entity.Gender;
 import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
 import ru.rom8.rescue.volunteer.dto.VolunteerDto;
 import ru.rom8.rescue.volunteer.dto.VolunteerRegisterRequest;
@@ -26,6 +27,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,10 +44,11 @@ class VolunteerControllerTest {
     private static final String USER_ID_HEADER = "X-USER-ID";
     private static final String REGISTER_REQUEST_FIXTURE = "/volunteer/register-request.json";
     private static final String UPDATE_REQUEST_FIXTURE = "/volunteer/update-request.json";
+    private static final String CONTACT_VALUE_SEPARATOR = ":";
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(POSTGRES_IMAGE);
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(POSTGRES_IMAGE);
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -62,13 +65,13 @@ class VolunteerControllerTest {
     @Order(1)
     @DisplayName("1. Регистрация волонтёра")
     void shouldRegisterVolunteerViaRestEndpoint() throws Exception {
-        VolunteerDto registeredVolunteer = registerVolunteer();
+        VolunteerDto volunteer = registerVolunteer();
 
-        registeredVolunteerId = registeredVolunteer.id();
-        registeredUserId = registeredVolunteer.userId();
+        registeredVolunteerId = volunteer.id();
+        registeredUserId = volunteer.userId();
 
         assertThat(registeredUserId).startsWith("volunteer-");
-        assertVolunteerMatchesRegistration(registeredVolunteer);
+        assertVolunteerMatchesRegistration(volunteer);
     }
 
     @Test
@@ -78,10 +81,10 @@ class VolunteerControllerTest {
         assertThat(registeredVolunteerId).isNotNull();
         assertThat(registeredUserId).isNotBlank();
 
-        VolunteerDto volunteerBeforeUpdate = getVolunteer(registeredUserId, HttpStatus.OK);
+        VolunteerDto volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
 
-        assertThat(volunteerBeforeUpdate.id()).isEqualTo(registeredVolunteerId);
-        assertVolunteerMatchesRegistration(volunteerBeforeUpdate);
+        assertThat(volunteer.id()).isEqualTo(registeredVolunteerId);
+        assertVolunteerMatchesRegistration(volunteer);
     }
 
     @Test
@@ -91,10 +94,10 @@ class VolunteerControllerTest {
         assertThat(registeredVolunteerId).isNotNull();
         assertThat(registeredUserId).isNotBlank();
 
-        VolunteerDto updatedVolunteer = updateVolunteer(registeredUserId);
+        VolunteerDto volunteer = updateVolunteer(registeredUserId);
 
-        assertThat(updatedVolunteer.id()).isEqualTo(registeredVolunteerId);
-        assertVolunteerMatchesUpdate(updatedVolunteer);
+        assertThat(volunteer.id()).isEqualTo(registeredVolunteerId);
+        assertVolunteerMatchesUpdate(volunteer);
     }
 
     @Test
@@ -104,10 +107,10 @@ class VolunteerControllerTest {
         assertThat(registeredVolunteerId).isNotNull();
         assertThat(registeredUserId).isNotBlank();
 
-        VolunteerDto volunteerAfterUpdate = getVolunteer(registeredUserId, HttpStatus.OK);
+        VolunteerDto volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
 
-        assertThat(volunteerAfterUpdate.id()).isEqualTo(registeredVolunteerId);
-        assertVolunteerMatchesUpdate(volunteerAfterUpdate);
+        assertThat(volunteer.id()).isEqualTo(registeredVolunteerId);
+        assertVolunteerMatchesUpdate(volunteer);
     }
 
     @Test
@@ -207,39 +210,61 @@ class VolunteerControllerTest {
     private void assertVolunteerMatchesRegistration(VolunteerDto volunteer) throws Exception {
         VolunteerRegisterRequest expected = readRegisterRequestFixture();
 
-        assertThat(volunteer.firstName()).isEqualTo(expected.firstName());
-        assertThat(volunteer.familyName()).isEqualTo(expected.familyName());
-        assertThat(volunteer.patronymic()).isEqualTo(expected.patronymic());
-        assertThat(volunteer.gender()).isEqualTo(expected.gender());
-        assertThat(volunteer.birthDate()).isEqualTo(expected.birthDate());
-        assertThat(volunteer.status()).isEqualTo(VolunteerStatus.FREE);
-        assertThat(volunteer.locationId()).isNotNull();
-        assertThat(volunteer.currentIncidentId()).isNull();
-        assertThat(volunteer.contacts())
-                .extracting(contact -> contact.contactType() + ":" + contact.contact())
-                .containsExactlyInAnyOrder(
-                        ContactType.PHONE + ":" + expected.phoneNumber(),
-                        ContactType.EMAIL + ":" + expected.email()
-                );
+        assertVolunteerPersonalData(
+                volunteer,
+                expected.firstName(),
+                expected.familyName(),
+                expected.patronymic(),
+                expected.gender(),
+                expected.birthDate()
+        );
+        assertVolunteerCommonState(volunteer);
+        assertVolunteerContacts(volunteer, expected.phoneNumber(), expected.email());
     }
 
     private void assertVolunteerMatchesUpdate(VolunteerDto volunteer) throws Exception {
         VolunteerRegisterRequest registration = readRegisterRequestFixture();
         VolunteerUpdateRequest expected = readUpdateRequestFixture();
 
-        assertThat(volunteer.firstName()).isEqualTo(expected.firstName());
-        assertThat(volunteer.familyName()).isEqualTo(expected.familyName());
-        assertThat(volunteer.patronymic()).isEqualTo(expected.patronymic());
-        assertThat(volunteer.gender()).isEqualTo(registration.gender());
-        assertThat(volunteer.birthDate()).isEqualTo(registration.birthDate());
+        assertVolunteerPersonalData(
+                volunteer,
+                expected.firstName(),
+                expected.familyName(),
+                expected.patronymic(),
+                registration.gender(),
+                registration.birthDate()
+        );
+        assertVolunteerCommonState(volunteer);
+        assertVolunteerContacts(volunteer, expected.phoneNumber(), expected.email());
+    }
+
+    private void assertVolunteerPersonalData(
+            VolunteerDto volunteer,
+            String expectedFirstName,
+            String expectedFamilyName,
+            String expectedPatronymic,
+            Gender expectedGender,
+            LocalDate expectedBirthDate
+    ) {
+        assertThat(volunteer.firstName()).isEqualTo(expectedFirstName);
+        assertThat(volunteer.familyName()).isEqualTo(expectedFamilyName);
+        assertThat(volunteer.patronymic()).isEqualTo(expectedPatronymic);
+        assertThat(volunteer.gender()).isEqualTo(expectedGender);
+        assertThat(volunteer.birthDate()).isEqualTo(expectedBirthDate);
+    }
+
+    private void assertVolunteerCommonState(VolunteerDto volunteer) {
         assertThat(volunteer.status()).isEqualTo(VolunteerStatus.FREE);
         assertThat(volunteer.locationId()).isNotNull();
         assertThat(volunteer.currentIncidentId()).isNull();
+    }
+
+    private void assertVolunteerContacts(VolunteerDto volunteer, String expectedPhoneNumber, String expectedEmail) {
         assertThat(volunteer.contacts())
-                .extracting(contact -> contact.contactType() + ":" + contact.contact())
+                .extracting(contact -> contact.contactType() + CONTACT_VALUE_SEPARATOR + contact.contact())
                 .containsExactlyInAnyOrder(
-                        ContactType.PHONE + ":" + expected.phoneNumber(),
-                        ContactType.EMAIL + ":" + expected.email()
+                        ContactType.PHONE + CONTACT_VALUE_SEPARATOR + expectedPhoneNumber,
+                        ContactType.EMAIL + CONTACT_VALUE_SEPARATOR + expectedEmail
                 );
     }
 }
