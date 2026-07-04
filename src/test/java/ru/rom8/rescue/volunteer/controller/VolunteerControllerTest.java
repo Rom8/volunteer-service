@@ -18,6 +18,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import ru.rom8.rescue.volunteer.api.model.ContactType;
 import ru.rom8.rescue.volunteer.api.model.Gender;
 import ru.rom8.rescue.volunteer.api.model.VolunteerDto;
+import ru.rom8.rescue.volunteer.api.model.VolunteerIncidentAction;
+import ru.rom8.rescue.volunteer.api.model.VolunteerIncidentActionRequest;
 import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequest;
 import ru.rom8.rescue.volunteer.api.model.VolunteerStatus;
 import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequest;
@@ -29,6 +31,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +48,7 @@ class VolunteerControllerTest {
     private static final String INTERNAL_BASE_URL = "/internal/api/v1/volunteer";
     private static final String REGISTER_ME_URL = BASE_URL + "/register/me";
     private static final String ME_URL = BASE_URL + "/me";
+    private static final String INCIDENT_ACTION_URL = ME_URL + "/incident/act";
     private static final String ADMIN_VOLUNTEER_LIST_URL = ADMIN_BASE_URL + "/list";
     private static final String INTERNAL_VOLUNTEER_LIST_URL = INTERNAL_BASE_URL + "/list";
     private static final String USER_ID_HEADER = "X-USER-ID";
@@ -53,6 +57,7 @@ class VolunteerControllerTest {
     private static final String CONTACT_VALUE_SEPARATOR = ":";
     private static final String PHONE_NUMBER_FORMAT = "+7999001%04d";
     private static final String EMAIL_FORMAT = "volunteer-%d@example.org";
+    private static final UUID INCIDENT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     @Container
     @ServiceConnection
@@ -196,7 +201,35 @@ class VolunteerControllerTest {
 
     @Test
     @Order(8)
-    @DisplayName("8. Удаление своей учётной записи волонтёра")
+    @DisplayName("8. Принятие участия в инциденте")
+    void shouldAcceptIncidentViaRestEndpoint() throws Exception {
+        assertThat(registeredVolunteerId).isNotNull();
+        assertThat(registeredUserId).isNotBlank();
+
+        VolunteerDto volunteer = actOnIncident(registeredUserId, VolunteerIncidentAction.ACCEPT);
+
+        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.ASSIGNED_TASK);
+        assertThat(volunteer.getCurrentIncidentId()).isEqualTo(INCIDENT_ID);
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("9. Отказ от участия в инциденте")
+    void shouldRejectIncidentViaRestEndpoint() throws Exception {
+        assertThat(registeredVolunteerId).isNotNull();
+        assertThat(registeredUserId).isNotBlank();
+
+        VolunteerDto volunteer = actOnIncident(registeredUserId, VolunteerIncidentAction.REJECT);
+
+        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.FREE);
+        assertThat(volunteer.getCurrentIncidentId()).isNull();
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("10. Удаление своей учётной записи волонтёра")
     void shouldDeleteOwnRegistrationViaRestEndpoint() throws Exception {
         assertThat(registeredUserId).isNotBlank();
 
@@ -251,6 +284,21 @@ class VolunteerControllerTest {
                 requestBuilder(ME_URL)
                         .header(USER_ID_HEADER, userId)
                         .method("PATCH", jsonBody(request))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.OK.value());
+        return readVolunteer(response);
+    }
+
+    private VolunteerDto actOnIncident(String userId, VolunteerIncidentAction action) throws Exception {
+        VolunteerIncidentActionRequest request = new VolunteerIncidentActionRequest(INCIDENT_ID, action);
+
+        HttpResponse<String> response = httpClient.send(
+                requestBuilder(INCIDENT_ACTION_URL)
+                        .header(USER_ID_HEADER, userId)
+                        .POST(jsonBody(request))
                         .build(),
                 HttpResponse.BodyHandlers.ofString()
         );
