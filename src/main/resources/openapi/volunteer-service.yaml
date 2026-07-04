@@ -34,6 +34,33 @@ paths:
                 $ref: '#/components/schemas/VolunteerDto'
         '400':
           $ref: '#/components/responses/BadRequest'
+  /api/v1/volunteer/me/incident/act:
+    post:
+      tags:
+        - Volunteer
+      operationId: actOnIncident
+      summary: Принятие или отказ от участия в инциденте
+      parameters:
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VolunteerIncidentActionRequest'
+      responses:
+        '200':
+          description: Действие по инциденту применено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerDto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /api/v1/volunteer/me:
     get:
       tags:
@@ -191,7 +218,26 @@ components:
       description: Некорректный запрос
     NotFound:
       description: Волонтёр не найден
+    Conflict:
+      description: Конфликт текущего состояния волонтёра
   schemas:
+    VolunteerIncidentActionRequest:
+      type: object
+      required:
+        - incidentId
+        - action
+      properties:
+        incidentId:
+          type: string
+          format: uuid
+        action:
+          $ref: '#/components/schemas/VolunteerIncidentAction'
+    VolunteerIncidentAction:
+      type: string
+      description: Действие волонтёра по инциденту
+      enum:
+        - ACCEPT
+        - REJECT
     VolunteerRegisterRequest:
       type: object
       required:

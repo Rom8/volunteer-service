@@ -1,10 +1,11 @@
 package ru.rom8.rescue.volunteer.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
-import ru.rom8.rescue.volunteer.domain.entity.VolunteerStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,10 @@ import java.util.Optional;
 public interface VolunteerRepository extends JpaRepository<Volunteer, Long> {
 
     Optional<Volunteer> findByUserId(String userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select volunteer from Volunteer volunteer where volunteer.userId = :userId")
+    Optional<Volunteer> findByUserIdForUpdate(@Param("userId") String userId);
 
     @Query(value = """
             select volunteer.*
