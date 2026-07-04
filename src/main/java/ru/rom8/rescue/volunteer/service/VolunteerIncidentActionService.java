@@ -1,6 +1,8 @@
 package ru.rom8.rescue.volunteer.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,12 +22,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VolunteerIncidentActionService {
 
-    private static final String USER_ID_HEADER_REQUIRED_MESSAGE = "Header X-USER-ID is required";
-    private static final String VOLUNTEER_NOT_FOUND_MESSAGE = "Volunteer registration not found";
-    private static final String VOLUNTEER_ALREADY_ASSIGNED_MESSAGE = "Volunteer is already assigned to another incident";
-
     private final VolunteerRepository volunteerRepository;
     private final VolunteerMapper volunteerMapper;
+    private final MessageSource messageSource;
 
     @Transactional
     public VolunteerDto actOnIncident(String userId, VolunteerIncidentActionRequest request) {
@@ -43,16 +42,16 @@ public class VolunteerIncidentActionService {
 
     private Volunteer getVolunteerByUserIdForUpdate(String userId) {
         if (!StringUtils.hasText(userId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, USER_ID_HEADER_REQUIRED_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, getMessage("volunteer.error.user-id-header-required"));
         }
 
         return volunteerRepository.findByUserIdForUpdate(userId.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, getMessage("volunteer.error.not-found")));
     }
 
     private void acceptIncident(Volunteer volunteer, UUID incidentId) {
         if (volunteer.getStatus() == VolunteerStatus.ASSIGNED_TASK && !incidentId.equals(volunteer.getCurrentIncidentId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, VOLUNTEER_ALREADY_ASSIGNED_MESSAGE);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, getMessage("volunteer.error.already-assigned"));
         }
 
         volunteer.setStatus(VolunteerStatus.ASSIGNED_TASK);
@@ -64,5 +63,9 @@ public class VolunteerIncidentActionService {
             volunteer.setStatus(VolunteerStatus.FREE);
             volunteer.setCurrentIncidentId(null);
         }
+    }
+
+    private String getMessage(String messageKey) {
+        return messageSource.getMessage(messageKey, null, LocaleContextHolder.getLocale());
     }
 }
