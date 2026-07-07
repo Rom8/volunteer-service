@@ -58,6 +58,7 @@ class VolunteerControllerTest {
     private static final String PHONE_NUMBER_FORMAT = "+7999001%04d";
     private static final String EMAIL_FORMAT = "volunteer-%d@example.org";
     private static final UUID INCIDENT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID OTHER_INCIDENT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
     @Container
     @ServiceConnection
@@ -73,8 +74,8 @@ class VolunteerControllerTest {
 
     private final AtomicInteger testVolunteerCounter = new AtomicInteger();
 
-    private Long registeredVolunteerId;
-    private String registeredUserId;
+    private Long id;
+    private String userId;
 
     @Test
     @Order(1)
@@ -82,10 +83,10 @@ class VolunteerControllerTest {
     void shouldRegisterVolunteerViaRestEndpoint() throws Exception {
         VolunteerDto volunteer = registerVolunteer();
 
-        registeredVolunteerId = volunteer.getId();
-        registeredUserId = volunteer.getUserId();
+        id = volunteer.getId();
+        userId = volunteer.getUserId();
 
-        assertThat(registeredUserId).startsWith("volunteer-");
+        assertThat(userId).startsWith("volunteer-");
         assertVolunteerMatchesRegistration(volunteer);
     }
 
@@ -93,12 +94,12 @@ class VolunteerControllerTest {
     @Order(2)
     @DisplayName("2. Просмотр данных о своей регистрации")
     void shouldViewOwnRegistrationViaRestEndpoint() throws Exception {
-        assertThat(registeredVolunteerId).isNotNull();
-        assertThat(registeredUserId).isNotBlank();
+        assertThat(id).isNotNull();
+        assertThat(userId).isNotBlank();
 
-        VolunteerDto volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
+        VolunteerDto volunteer = getVolunteer(userId, HttpStatus.OK);
 
-        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(id);
         assertVolunteerMatchesRegistration(volunteer);
     }
 
@@ -106,12 +107,12 @@ class VolunteerControllerTest {
     @Order(3)
     @DisplayName("3. Обновление данных о себе")
     void shouldUpdateOwnRegistrationViaRestEndpoint() throws Exception {
-        assertThat(registeredVolunteerId).isNotNull();
-        assertThat(registeredUserId).isNotBlank();
+        assertThat(id).isNotNull();
+        assertThat(userId).isNotBlank();
 
-        VolunteerDto volunteer = updateVolunteer(registeredUserId);
+        VolunteerDto volunteer = updateVolunteer(userId);
 
-        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(id);
         assertVolunteerMatchesUpdate(volunteer);
     }
 
@@ -119,12 +120,12 @@ class VolunteerControllerTest {
     @Order(4)
     @DisplayName("4. Просмотр обновлённых данных о своей регистрации")
     void shouldViewUpdatedOwnRegistrationViaRestEndpoint() throws Exception {
-        assertThat(registeredVolunteerId).isNotNull();
-        assertThat(registeredUserId).isNotBlank();
+        assertThat(id).isNotNull();
+        assertThat(userId).isNotBlank();
 
-        VolunteerDto volunteer = getVolunteer(registeredUserId, HttpStatus.OK);
+        VolunteerDto volunteer = getVolunteer(userId, HttpStatus.OK);
 
-        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(id);
         assertVolunteerMatchesUpdate(volunteer);
     }
 
@@ -203,46 +204,74 @@ class VolunteerControllerTest {
     @Order(8)
     @DisplayName("8. Принятие участия в инциденте")
     void shouldAcceptIncidentViaRestEndpoint() throws Exception {
-        assertThat(registeredVolunteerId).isNotNull();
-        assertThat(registeredUserId).isNotBlank();
+        assertThat(id).isNotNull();
+        assertThat(userId).isNotBlank();
 
-        VolunteerDto volunteer = actOnIncident(registeredUserId, VolunteerIncidentAction.ACCEPT);
+        VolunteerDto volunteer = actOnIncident(userId, VolunteerIncidentAction.ACCEPT);
 
-        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(id);
         assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.ASSIGNED_TASK);
         assertThat(volunteer.getCurrentIncidentId()).isEqualTo(INCIDENT_ID);
     }
 
     @Test
     @Order(9)
-    @DisplayName("9. Отказ от участия в инциденте")
+    @DisplayName("9. Ошибка при принятии другого инцидента назначенным волонтёром")
+    void shouldReturnConflictWhenAssignedVolunteerAcceptsAnotherIncidentViaRestEndpoint() throws Exception {
+        assertThat(id).isNotNull();
+        assertThat(userId).isNotBlank();
+
+        VolunteerIncidentActionRequest request = new VolunteerIncidentActionRequest(
+                OTHER_INCIDENT_ID,
+                VolunteerIncidentAction.ACCEPT
+        );
+
+        HttpResponse<String> response = httpClient.send(
+                requestBuilder(INCIDENT_ACTION_URL)
+                        .header(USER_ID_HEADER, userId)
+                        .POST(jsonBody(request))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString()
+        );
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.CONFLICT.value());
+
+        VolunteerDto volunteer = getVolunteer(userId, HttpStatus.OK);
+        assertThat(volunteer.getId()).isEqualTo(id);
+        assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.ASSIGNED_TASK);
+        assertThat(volunteer.getCurrentIncidentId()).isEqualTo(INCIDENT_ID);
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("10. Отказ от участия в инциденте")
     void shouldRejectIncidentViaRestEndpoint() throws Exception {
-        assertThat(registeredVolunteerId).isNotNull();
-        assertThat(registeredUserId).isNotBlank();
+        assertThat(id).isNotNull();
+        assertThat(userId).isNotBlank();
 
-        VolunteerDto volunteer = actOnIncident(registeredUserId, VolunteerIncidentAction.REJECT);
+        VolunteerDto volunteer = actOnIncident(userId, VolunteerIncidentAction.REJECT);
 
-        assertThat(volunteer.getId()).isEqualTo(registeredVolunteerId);
+        assertThat(volunteer.getId()).isEqualTo(id);
         assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.FREE);
         assertThat(volunteer.getCurrentIncidentId()).isNull();
     }
 
     @Test
-    @Order(10)
-    @DisplayName("10. Удаление своей учётной записи волонтёра")
+    @Order(11)
+    @DisplayName("11. Удаление своей учётной записи волонтёра")
     void shouldDeleteOwnRegistrationViaRestEndpoint() throws Exception {
-        assertThat(registeredUserId).isNotBlank();
+        assertThat(userId).isNotBlank();
 
         HttpResponse<String> deleteResponse = httpClient.send(
                 requestBuilder(ME_URL)
-                        .header(USER_ID_HEADER, registeredUserId)
+                        .header(USER_ID_HEADER, userId)
                         .DELETE()
                         .build(),
                 HttpResponse.BodyHandlers.ofString()
         );
         assertThat(deleteResponse.statusCode()).isEqualTo(HttpStatus.NO_CONTENT.value());
 
-        getVolunteer(registeredUserId, HttpStatus.NOT_FOUND);
+        getVolunteer(userId, HttpStatus.NOT_FOUND);
     }
 
     private VolunteerDto registerVolunteer() throws Exception {
