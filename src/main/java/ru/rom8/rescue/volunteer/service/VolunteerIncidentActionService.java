@@ -67,6 +67,15 @@ public class VolunteerIncidentActionService {
         sendIncidentEvent(volunteer, incidentId, "ACCEPT");
     }
 
+    private void rejectIncident(Volunteer volunteer, UUID incidentId) {
+        if (volunteer.getStatus() == VolunteerStatus.ASSIGNED_TASK && incidentId.equals(volunteer.getCurrentIncidentId())) {
+            volunteer.setStatus(VolunteerStatus.FREE);
+            volunteer.setCurrentIncidentId(null);
+            sendIncidentEvent(volunteer, incidentId, "REJECT");
+        }
+    }
+
+    //todo: make transactional outbox
     private void sendIncidentEvent(Volunteer volunteer, UUID incidentId, String status) {
         VolunteerIncidentAssignEvent event = new VolunteerIncidentAssignEvent(incidentId, volunteer.getId(), status);
 
@@ -74,14 +83,6 @@ public class VolunteerIncidentActionService {
             kafkaTemplate.send(VOLUNTEER_INCIDENT_ASSIGN_TOPIC, incidentId.toString(), objectMapper.writeValueAsString(event));
         } catch (JacksonException exception) {
             throw new IllegalStateException(KAFKA_MESSAGE_SERIALIZATION_ERROR, exception);
-        }
-    }
-
-    private void rejectIncident(Volunteer volunteer, UUID incidentId) {
-        if (volunteer.getStatus() == VolunteerStatus.ASSIGNED_TASK && incidentId.equals(volunteer.getCurrentIncidentId())) {
-            volunteer.setStatus(VolunteerStatus.FREE);
-            volunteer.setCurrentIncidentId(null);
-            sendIncidentEvent(volunteer, incidentId, "REJECT");
         }
     }
 
