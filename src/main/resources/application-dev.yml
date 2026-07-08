@@ -2,5 +2,3 @@ spring:
   output:
     ansi:
       enabled: ALWAYS   # Enable ANSI-colored output
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}

@@ -19,7 +19,8 @@ src/
 ├── main/resources/
 │   ├── db/changelog/     — Liquibase миграции
 │   ├── openapi/          — OpenAPI 3.1 спецификация (contract-first)
-│   └── application.yml   — Основная конфигурация
+│   ├── application.yml   — Основная конфигурация
+│   └── application-dev.yml  — Профиль разработки (ANSI-вывод)
 └── test/                 — Тесты (JUnit 5 + Testcontainers + EmbeddedKafka)
 ```
 
@@ -32,10 +33,15 @@ API-контракт генерируется из `openapi/volunteer-service.ya
 | `./mvnw clean install` | Полная сборка проекта, прогон тестов |
 | `docker compose up -d` | Запуск PostgreSQL + Kafka для разработки |
 | `./mvnw spring-boot:run` | Запуск приложения (порт 8080) |
+| `./mvnw spring-boot:run -Dspring-boot.run.profiles=dev` | Запуск с профилем `dev` |
 
 Профили:
-- `dev` — включает CORS, Kafka bootstrap на `localhost:9092`
-- По умолчанию — `application.yml` (параметры БД через переменные окружения)
+- `dev` — включает ANSI-вывод (`spring.output.ansi.enabled=ALWAYS`)
+- По умолчанию — `application.yml`:
+  - `ddl-auto: validate`, `open-in-view: false`
+  - Параметры БД: `SPRING_DATASOURCE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+  - Kafka: `SPRING_KAFKA_BOOTSTRAP_SERVERS` (по умолчанию `localhost:9092`)
+  - Liquibase: `classpath:db/changelog/db.changelog-master.yaml`
 
 ## Стиль кода и именование
 

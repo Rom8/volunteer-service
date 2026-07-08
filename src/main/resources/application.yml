@@ -9,3 +9,5 @@ spring:
     password: ${POSTGRES_PASSWORD}
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
