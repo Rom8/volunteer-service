@@ -1,36 +1,35 @@
 package ru.rom8.rescue.volunteer.controller;
 
-import tools.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestMethodOrder;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.test.EmbeddedKafkaBroker;
+import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
-import ru.rom8.rescue.volunteer.api.model.ContactType;
-import ru.rom8.rescue.volunteer.api.model.Gender;
-import ru.rom8.rescue.volunteer.api.model.VolunteerDto;
-import ru.rom8.rescue.volunteer.api.model.VolunteerIncidentAction;
-import ru.rom8.rescue.volunteer.api.model.VolunteerIncidentActionRequest;
-import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequest;
-import ru.rom8.rescue.volunteer.api.model.VolunteerStatus;
-import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequest;
+import ru.rom8.rescue.volunteer.api.model.*;
+import ru.rom8.rescue.volunteer.service.VolunteerIncidentAssignEvent;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -40,6 +39,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@EmbeddedKafka(
+        topics = VolunteerControllerTest.VOLUNTEER_INCIDENT_ASSIGN_TOPIC
+)
 class VolunteerControllerTest {
 
     private static final String POSTGRES_IMAGE = "postgres:17.10";
@@ -57,6 +59,7 @@ class VolunteerControllerTest {
     private static final String CONTACT_VALUE_SEPARATOR = ":";
     private static final String PHONE_NUMBER_FORMAT = "+7999001%04d";
     private static final String EMAIL_FORMAT = "volunteer-%d@example.org";
+    static final String VOLUNTEER_INCIDENT_ASSIGN_TOPIC = "volunteer_incident_assign_event_v1";
     private static final UUID INCIDENT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID OTHER_INCIDENT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
@@ -72,10 +75,25 @@ class VolunteerControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private EmbeddedKafkaBroker embeddedKafkaBroker;
+
     private final AtomicInteger testVolunteerCounter = new AtomicInteger();
 
     private Long id;
     private String userId;
+
+    Consumer<String, String> consumer;
+
+    @BeforeAll
+    void beforeAll() {
+        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps(embeddedKafkaBroker, "test-VolunteerControllerTest", false);
+        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        var kafkaConsumerFactory = new DefaultKafkaConsumerFactory<String, String>(consumerProps);
+        consumer = kafkaConsumerFactory.createConsumer();
+        embeddedKafkaBroker.consumeFromAnEmbeddedTopic(consumer, VOLUNTEER_INCIDENT_ASSIGN_TOPIC);
+    }
 
     @Test
     @Order(1)
@@ -212,6 +230,22 @@ class VolunteerControllerTest {
         assertThat(volunteer.getId()).isEqualTo(id);
         assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.ASSIGNED_TASK);
         assertThat(volunteer.getCurrentIncidentId()).isEqualTo(INCIDENT_ID);
+
+        checkLastMessageFromTopic("ACCEPT");
+    }
+
+    private void checkLastMessageFromTopic(String status) {
+        ConsumerRecord<String, String> consumerRecord = KafkaTestUtils.getSingleRecord(
+                consumer, VOLUNTEER_INCIDENT_ASSIGN_TOPIC, Duration.ofSeconds(5));
+
+        UUID key = UUID.fromString(consumerRecord.key());
+        assertThat(key).isEqualTo(INCIDENT_ID);
+
+        VolunteerIncidentAssignEvent volunteerIncidentAssignEvent =
+                objectMapper.readValue(consumerRecord.value(), VolunteerIncidentAssignEvent.class);
+        assertThat(volunteerIncidentAssignEvent.incidentId()).isEqualTo(INCIDENT_ID);
+        assertThat(volunteerIncidentAssignEvent.volunteerId()).isEqualTo(id);
+        assertThat(volunteerIncidentAssignEvent.status()).isEqualTo(status);
     }
 
     @Test
@@ -254,6 +288,8 @@ class VolunteerControllerTest {
         assertThat(volunteer.getId()).isEqualTo(id);
         assertThat(volunteer.getStatus()).isEqualTo(VolunteerStatus.FREE);
         assertThat(volunteer.getCurrentIncidentId()).isNull();
+
+        checkLastMessageFromTopic("REJECT");
     }
 
     @Test
