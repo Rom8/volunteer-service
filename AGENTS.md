@@ -48,13 +48,28 @@ API-контракт генерируется из `openapi/volunteer-service.ya
 
 ### Тесты
 
-- JUnit 5, `@TestMethodOrder(MethodOrderer.OrderAnnotation.class)`
+Два подхода к тестированию:
+
+**Unit-тесты сервисов** (`<Service>Test`):
+- `@ExtendWith(MockitoExtension.class)`, зависимости мокаются через `@Mock`
+- `MessageSource` не мокается — в `@BeforeEach` создаётся реальный `ResourceBundleMessageSource`:
+  ```java
+  ResourceBundleMessageSource messageSource = new ResourceBundleMessageSource();
+  messageSource.setBasename("messages");
+  messageSource.setDefaultEncoding("UTF-8");
+  ```
+  Сообщения читаются из `src/main/resources/messages.properties` (общий classpath)
+
+**Интеграционные тесты контроллеров** (`<Controller>Test`):
+- `@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)`
 - `@Testcontainers` для PostgreSQL, `@EmbeddedKafka` для Kafka
-- Java `HttpClient` для интеграционных HTTP-запросов, Jackson `ObjectMapper` для десериализации
-- Фикстуры — JSON-файлы в `src/test/resources/volunteer/`
+- `@TestMethodOrder(MethodOrderer.OrderAnnotation.class)` — тесты зависят друг от друга
+- Java `HttpClient` для реальных HTTP-запросов, Jackson `ObjectMapper` для десериализации
+
+Общее:
 - Assertions через AssertJ (`assertThat`)
-- Нумерация тестов через `@Order` и `@DisplayName` в формате: `"N. Описание на русском"`
-- Имя тестового класса: `<Controller>Test`
+- Над каждым тестом аннотация `@DisplayName` в формате: `"Описание на русском"`
+- Фикстуры (JSON-файлы запросов) в `src/test/resources/volunteer/`
 
 ## VCS: коммиты и PR
 
