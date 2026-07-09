@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: Volunteer Service
   jpa:
     hibernate:
       ddl-auto: validate
@@ -15,6 +17,4 @@ spring:
 logging:
   structured:
     format:
-      file: ecs
-  file:
-    name: log.json
+      console: ecs

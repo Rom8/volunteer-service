@@ -2,3 +2,10 @@ spring:
   output:
     ansi:
       enabled: ALWAYS   # Enable ANSI-colored output
+logging:
+  structured:
+    format:
+      console:
+      file: ecs
+  file:
+    name: ${LOGGING_FILE_NAME:target/log.json}
