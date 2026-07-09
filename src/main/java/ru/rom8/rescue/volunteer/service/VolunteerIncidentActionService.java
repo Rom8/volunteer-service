@@ -1,6 +1,7 @@
 package ru.rom8.rescue.volunteer.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VolunteerIncidentActionService {
@@ -38,6 +40,13 @@ public class VolunteerIncidentActionService {
     public VolunteerDto actOnIncident(String userId, VolunteerIncidentActionRequest request) {
         Volunteer volunteer = getVolunteerByUserIdForUpdate(userId);
         UUID incidentId = request.getIncidentId();
+        log.atInfo()
+                .addKeyValue("event", "VolunteerIncidentActionRequested")
+                .addKeyValue("volunteer_id", volunteer.getId())
+                .addKeyValue("user_id", volunteer.getUserId())
+                .addKeyValue("incident_id", incidentId)
+                .addKeyValue("action", request.getAction())
+                .log("Volunteer incident action requested");
 
         if (request.getAction() == VolunteerIncidentAction.ACCEPT) {
             acceptIncident(volunteer, incidentId);
@@ -50,20 +59,44 @@ public class VolunteerIncidentActionService {
 
     private Volunteer getVolunteerByUserIdForUpdate(String userId) {
         if (!StringUtils.hasText(userId)) {
+            log.atWarn()
+                    .addKeyValue("event", "VolunteerUserIdMissing")
+                    .log("Volunteer user id is missing");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, getMessage("volunteer.error.user-id-header-required"));
         }
 
-        return volunteerRepository.findByUserIdForUpdate(userId.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, getMessage("volunteer.error.not-found")));
+        String normalizedUserId = userId.trim();
+        return volunteerRepository.findByUserIdForUpdate(normalizedUserId)
+                .orElseThrow(() -> {
+                    log.atWarn()
+                            .addKeyValue("event", "VolunteerNotFound")
+                            .addKeyValue("user_id", normalizedUserId)
+                            .log("Volunteer not found");
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, getMessage("volunteer.error.not-found"));
+                });
     }
 
     private void acceptIncident(Volunteer volunteer, UUID incidentId) {
         if (volunteer.getStatus() == VolunteerStatus.ASSIGNED_TASK && !incidentId.equals(volunteer.getCurrentIncidentId())) {
+            log.atWarn()
+                    .addKeyValue("event", "VolunteerAlreadyAssigned")
+                    .addKeyValue("volunteer_id", volunteer.getId())
+                    .addKeyValue("user_id", volunteer.getUserId())
+                    .addKeyValue("incident_id", incidentId)
+                    .addKeyValue("current_incident_id", volunteer.getCurrentIncidentId())
+                    .log("Volunteer already assigned to another incident");
             throw new ResponseStatusException(HttpStatus.CONFLICT, getMessage("volunteer.error.already-assigned"));
         }
 
         volunteer.setStatus(VolunteerStatus.ASSIGNED_TASK);
         volunteer.setCurrentIncidentId(incidentId);
+        log.atInfo()
+                .addKeyValue("event", "VolunteerIncidentAccepted")
+                .addKeyValue("volunteer_id", volunteer.getId())
+                .addKeyValue("user_id", volunteer.getUserId())
+                .addKeyValue("incident_id", incidentId)
+                .addKeyValue("status", volunteer.getStatus())
+                .log("Volunteer incident accepted");
         sendIncidentEvent(volunteer, incidentId, "ACCEPT");
     }
 
@@ -71,6 +104,13 @@ public class VolunteerIncidentActionService {
         if (volunteer.getStatus() == VolunteerStatus.ASSIGNED_TASK && incidentId.equals(volunteer.getCurrentIncidentId())) {
             volunteer.setStatus(VolunteerStatus.FREE);
             volunteer.setCurrentIncidentId(null);
+            log.atInfo()
+                    .addKeyValue("event", "VolunteerIncidentRejected")
+                    .addKeyValue("volunteer_id", volunteer.getId())
+                    .addKeyValue("user_id", volunteer.getUserId())
+                    .addKeyValue("incident_id", incidentId)
+                    .addKeyValue("status", volunteer.getStatus())
+                    .log("Volunteer incident rejected");
             sendIncidentEvent(volunteer, incidentId, "REJECT");
         }
     }
@@ -81,7 +121,22 @@ public class VolunteerIncidentActionService {
 
         try {
             kafkaTemplate.send(VOLUNTEER_INCIDENT_ASSIGN_TOPIC, incidentId.toString(), objectMapper.writeValueAsString(event));
+            log.atInfo()
+                    .addKeyValue("event", "VolunteerIncidentAssignEventSendInitiated")
+                    .addKeyValue("topic", VOLUNTEER_INCIDENT_ASSIGN_TOPIC)
+                    .addKeyValue("volunteer_id", volunteer.getId())
+                    .addKeyValue("incident_id", incidentId)
+                    .addKeyValue("status", status)
+                    .log("Volunteer incident assign event send initiated");
         } catch (JacksonException exception) {
+            log.atError()
+                    .addKeyValue("event", "VolunteerIncidentAssignEventSerializationFailed")
+                    .addKeyValue("topic", VOLUNTEER_INCIDENT_ASSIGN_TOPIC)
+                    .addKeyValue("volunteer_id", volunteer.getId())
+                    .addKeyValue("incident_id", incidentId)
+                    .addKeyValue("status", status)
+                    .setCause(exception)
+                    .log("Failed to serialize volunteer incident assign event");
             throw new IllegalStateException(KAFKA_MESSAGE_SERIALIZATION_ERROR, exception);
         }
     }

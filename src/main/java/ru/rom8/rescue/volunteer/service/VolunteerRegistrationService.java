@@ -1,6 +1,7 @@
 package ru.rom8.rescue.volunteer.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VolunteerRegistrationService {
@@ -49,6 +51,12 @@ public class VolunteerRegistrationService {
         Volunteer savedVolunteer = volunteerRepository.save(volunteer);
         savedVolunteer.getContacts().add(createContact(savedVolunteer, request.getPhoneNumber(), ContactType.PHONE));
         savedVolunteer.getContacts().add(createContact(savedVolunteer, request.getEmail(), ContactType.EMAIL));
+
+        log.atInfo()
+                .addKeyValue("event", "VolunteerRegistered")
+                .addKeyValue("volunteer_id", savedVolunteer.getId())
+                .addKeyValue("user_id", savedVolunteer.getUserId())
+                .log("Volunteer registered");
 
         return volunteerMapper.toDto(savedVolunteer);
     }
@@ -100,21 +108,44 @@ public class VolunteerRegistrationService {
         updateContact(volunteer, request.getPhoneNumber(), ContactType.PHONE);
         updateContact(volunteer, request.getEmail(), ContactType.EMAIL);
 
-        return volunteerMapper.toDto(volunteerRepository.save(volunteer));
+        Volunteer savedVolunteer = volunteerRepository.save(volunteer);
+        log.atInfo()
+                .addKeyValue("event", "VolunteerUpdated")
+                .addKeyValue("volunteer_id", savedVolunteer.getId())
+                .addKeyValue("user_id", savedVolunteer.getUserId())
+                .log("Volunteer updated");
+
+        return volunteerMapper.toDto(savedVolunteer);
     }
 
     @Transactional
     public void deleteByUserId(String userId) {
-        volunteerRepository.delete(getVolunteerByUserId(userId));
+        Volunteer volunteer = getVolunteerByUserId(userId);
+        volunteerRepository.delete(volunteer);
+        log.atInfo()
+                .addKeyValue("event", "VolunteerDeleted")
+                .addKeyValue("volunteer_id", volunteer.getId())
+                .addKeyValue("user_id", volunteer.getUserId())
+                .log("Volunteer deleted");
     }
 
     private Volunteer getVolunteerByUserId(String userId) {
         if (!StringUtils.hasText(userId)) {
+            log.atWarn()
+                    .addKeyValue("event", "VolunteerUserIdMissing")
+                    .log("Volunteer user id is missing");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, USER_ID_HEADER_REQUIRED_MESSAGE);
         }
 
-        return volunteerRepository.findByUserId(userId.trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE));
+        String normalizedUserId = userId.trim();
+        return volunteerRepository.findByUserId(normalizedUserId)
+                .orElseThrow(() -> {
+                    log.atWarn()
+                            .addKeyValue("event", "VolunteerNotFound")
+                            .addKeyValue("user_id", normalizedUserId)
+                            .log("Volunteer not found");
+                    return new ResponseStatusException(HttpStatus.NOT_FOUND, VOLUNTEER_NOT_FOUND_MESSAGE);
+                });
     }
 
     private String normalizeFilter(String value) {
@@ -200,7 +231,14 @@ public class VolunteerRegistrationService {
         location.setName(name.trim());
         location.setParent(parent);
         location.setLocationKind(locationKind);
-        return locationRepository.save(location);
+        Location savedLocation = locationRepository.save(location);
+        log.atInfo()
+                .addKeyValue("event", "VolunteerLocationCreated")
+                .addKeyValue("location_id", savedLocation.getId())
+                .addKeyValue("location_kind", locationKind)
+                .addKeyValue("location", "***")
+                .log("Volunteer location created");
+        return savedLocation;
     }
 
     private ContactInfo createContact(Volunteer volunteer, String contact, ContactType contactType) {
@@ -208,7 +246,14 @@ public class VolunteerRegistrationService {
         contactInfo.setVolunteer(volunteer);
         contactInfo.setContact(contact.trim());
         contactInfo.setContactType(contactType);
-        return contactInfoRepository.save(contactInfo);
+        ContactInfo savedContactInfo = contactInfoRepository.save(contactInfo);
+        log.atInfo()
+                .addKeyValue("event", "VolunteerContactCreated")
+                .addKeyValue("volunteer_id", volunteer.getId())
+                .addKeyValue("contact_type", contactType)
+                .addKeyValue("contact", "***")
+                .log("Volunteer contact created");
+        return savedContactInfo;
     }
 
     private String generateUserId() {
