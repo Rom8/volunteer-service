@@ -16,7 +16,6 @@ import ru.rom8.rescue.volunteer.api.model.VolunteerIncidentActionRequest;
 import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
 import ru.rom8.rescue.volunteer.mapper.VolunteerMapper;
 import ru.rom8.rescue.volunteer.repository.VolunteerRepository;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -37,7 +36,6 @@ class VolunteerIncidentActionServiceTest {
     private static final UUID INCIDENT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     private static final UUID OTHER_INCIDENT_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
     private static final String VOLUNTEER_INCIDENT_ASSIGN_TOPIC = "volunteer_incident_assign_event_v1";
-    private static final String ACCEPT_EVENT_JSON = "{\"status\":\"ACCEPT\"}";
     private static final String USER_ID_REQUIRED_MESSAGE = "Header X-USER-ID is required.";
     private static final String VOLUNTEER_NOT_FOUND_MESSAGE = "Волонтёр не найден.";
     private static final String ALREADY_ASSIGNED_MESSAGE = "Волонтер может принимать участие только в одном инциденте.";
@@ -49,10 +47,7 @@ class VolunteerIncidentActionServiceTest {
     private VolunteerMapper volunteerMapper;
 
     @Mock
-    private KafkaTemplate<String, String> kafkaTemplate;
-
-    @Mock
-    private ObjectMapper objectMapper;
+    private KafkaTemplate<String, VolunteerIncidentAssignEvent> kafkaTemplate;
 
     private VolunteerIncidentActionService volunteerIncidentActionService;
 
@@ -66,22 +61,19 @@ class VolunteerIncidentActionServiceTest {
                 volunteerRepository,
                 volunteerMapper,
                 messageSource,
-                kafkaTemplate,
-                objectMapper
+                kafkaTemplate
         );
     }
 
     @Test
     @DisplayName("Свободный волонтёр принимает инцидент через сервис")
-    void shouldAcceptIncidentForFreeVolunteer() throws Exception {
+    void shouldAcceptIncidentForFreeVolunteer() {
         Volunteer volunteer = freeVolunteer();
         VolunteerDto expectedDto = volunteerDto(
                 ru.rom8.rescue.volunteer.api.model.VolunteerStatus.ASSIGNED_TASK,
                 INCIDENT_ID
         );
         when(volunteerRepository.findByUserIdForUpdate(USER_ID)).thenReturn(Optional.of(volunteer));
-        when(objectMapper.writeValueAsString(new VolunteerIncidentAssignEvent(INCIDENT_ID, VOLUNTEER_ID, "ACCEPT")))
-                .thenReturn(ACCEPT_EVENT_JSON);
         when(volunteerRepository.save(volunteer)).thenReturn(volunteer);
         when(volunteerMapper.toDto(volunteer)).thenReturn(expectedDto);
 
@@ -95,7 +87,11 @@ class VolunteerIncidentActionServiceTest {
         assertThat(result.getId()).isEqualTo(VOLUNTEER_ID);
         assertThat(result.getStatus()).isEqualTo(ru.rom8.rescue.volunteer.api.model.VolunteerStatus.ASSIGNED_TASK);
         assertThat(result.getCurrentIncidentId()).isEqualTo(INCIDENT_ID);
-        verify(kafkaTemplate).send(VOLUNTEER_INCIDENT_ASSIGN_TOPIC, INCIDENT_ID.toString(), ACCEPT_EVENT_JSON);
+        verify(kafkaTemplate).send(
+                VOLUNTEER_INCIDENT_ASSIGN_TOPIC,
+                INCIDENT_ID.toString(),
+                new VolunteerIncidentAssignEvent(INCIDENT_ID, VOLUNTEER_ID, "ACCEPT")
+        );
         verify(volunteerRepository).save(volunteer);
     }
 
@@ -118,7 +114,7 @@ class VolunteerIncidentActionServiceTest {
         assertThat(volunteer.getCurrentIncidentId()).isEqualTo(INCIDENT_ID);
         verify(volunteerRepository).findByUserIdForUpdate(USER_ID);
         verify(volunteerRepository, never()).save(any());
-        verifyNoInteractions(volunteerMapper, objectMapper, kafkaTemplate);
+        verifyNoInteractions(volunteerMapper, kafkaTemplate);
     }
 
     @Test
@@ -143,7 +139,7 @@ class VolunteerIncidentActionServiceTest {
         assertThat(result.getId()).isEqualTo(VOLUNTEER_ID);
         assertThat(result.getStatus()).isEqualTo(ru.rom8.rescue.volunteer.api.model.VolunteerStatus.FREE);
         assertThat(result.getCurrentIncidentId()).isNull();
-        verifyNoInteractions(objectMapper, kafkaTemplate);
+        verifyNoInteractions(kafkaTemplate);
         verify(volunteerRepository).save(volunteer);
     }
 
@@ -159,7 +155,7 @@ class VolunteerIncidentActionServiceTest {
                     assertThat(exception.getReason()).isEqualTo(USER_ID_REQUIRED_MESSAGE);
                 });
 
-        verifyNoInteractions(volunteerRepository, volunteerMapper, objectMapper, kafkaTemplate);
+        verifyNoInteractions(volunteerRepository, volunteerMapper, kafkaTemplate);
     }
 
     @Test
@@ -178,7 +174,7 @@ class VolunteerIncidentActionServiceTest {
 
         verify(volunteerRepository).findByUserIdForUpdate(USER_ID);
         verify(volunteerRepository, never()).save(any());
-        verifyNoInteractions(volunteerMapper, objectMapper, kafkaTemplate);
+        verifyNoInteractions(volunteerMapper, kafkaTemplate);
     }
 
     private Volunteer freeVolunteer() {

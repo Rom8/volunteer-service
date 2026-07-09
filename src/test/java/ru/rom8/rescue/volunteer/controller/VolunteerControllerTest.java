@@ -11,6 +11,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
@@ -83,14 +84,17 @@ class VolunteerControllerTest {
     private Long id;
     private String userId;
 
-    Consumer<String, String> consumer;
+    Consumer<String, VolunteerIncidentAssignEvent> consumer;
 
     @BeforeAll
     void beforeAll() {
         Map<String, Object> consumerProps = KafkaTestUtils.consumerProps(embeddedKafkaBroker, "test-VolunteerControllerTest", false);
-        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-        var kafkaConsumerFactory = new DefaultKafkaConsumerFactory<String, String>(consumerProps);
+        var kafkaConsumerFactory = new DefaultKafkaConsumerFactory<>(
+                consumerProps,
+                new StringDeserializer(),
+                new JacksonJsonDeserializer<>(VolunteerIncidentAssignEvent.class, false)
+        );
         consumer = kafkaConsumerFactory.createConsumer();
         embeddedKafkaBroker.consumeFromAnEmbeddedTopic(consumer, VOLUNTEER_INCIDENT_ASSIGN_TOPIC);
     }
@@ -235,14 +239,13 @@ class VolunteerControllerTest {
     }
 
     private void checkLastMessageFromTopic(String status) {
-        ConsumerRecord<String, String> consumerRecord = KafkaTestUtils.getSingleRecord(
+        ConsumerRecord<String, VolunteerIncidentAssignEvent> consumerRecord = KafkaTestUtils.getSingleRecord(
                 consumer, VOLUNTEER_INCIDENT_ASSIGN_TOPIC, Duration.ofSeconds(5));
 
         UUID key = UUID.fromString(consumerRecord.key());
         assertThat(key).isEqualTo(INCIDENT_ID);
 
-        VolunteerIncidentAssignEvent volunteerIncidentAssignEvent =
-                objectMapper.readValue(consumerRecord.value(), VolunteerIncidentAssignEvent.class);
+        VolunteerIncidentAssignEvent volunteerIncidentAssignEvent = consumerRecord.value();
         assertThat(volunteerIncidentAssignEvent.incidentId()).isEqualTo(INCIDENT_ID);
         assertThat(volunteerIncidentAssignEvent.volunteerId()).isEqualTo(id);
         assertThat(volunteerIncidentAssignEvent.status()).isEqualTo(status);
