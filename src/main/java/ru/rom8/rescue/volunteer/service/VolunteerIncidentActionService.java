@@ -113,7 +113,7 @@ public class VolunteerIncidentActionService {
 
     //todo: make transactional outbox
     private void sendIncidentEvent(Volunteer volunteer, UUID incidentId, String status) {
-        VolunteerIncidentAssignEvent event = new VolunteerIncidentAssignEvent(incidentId, volunteer.getId(), status);
+        VolunteerIncidentAssignEvent event = new VolunteerIncidentAssignEvent(incidentId.toString(), volunteer.getId(), status);
         kafkaTemplate.send(VOLUNTEER_INCIDENT_ASSIGN_TOPIC, incidentId.toString(), event);
         log.atInfo()
                 .addKeyValue("event", "VolunteerIncidentAssignEventSendInitiated")

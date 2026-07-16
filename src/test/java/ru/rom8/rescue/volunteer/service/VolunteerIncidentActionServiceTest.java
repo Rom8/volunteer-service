@@ -90,7 +90,7 @@ class VolunteerIncidentActionServiceTest {
         verify(kafkaTemplate).send(
                 VOLUNTEER_INCIDENT_ASSIGN_TOPIC,
                 INCIDENT_ID.toString(),
-                new VolunteerIncidentAssignEvent(INCIDENT_ID, VOLUNTEER_ID, "ACCEPT")
+                new VolunteerIncidentAssignEvent(INCIDENT_ID.toString(), VOLUNTEER_ID, "ACCEPT")
         );
         verify(volunteerRepository).save(volunteer);
     }

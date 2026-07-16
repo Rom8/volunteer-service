@@ -13,10 +13,10 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    properties:
+      schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
     producer:
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        spring.json.add.type.headers: false
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
 
 logging:
   structured:

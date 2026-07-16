@@ -3,6 +3,8 @@ package ru.rom8.rescue.volunteer.controller;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +13,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
+
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
@@ -39,7 +41,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spring.kafka.properties.schema.registry.url=mock://volunteer-controller-test"
+)
 @EmbeddedKafka(
         topics = VolunteerControllerTest.VOLUNTEER_INCIDENT_ASSIGN_TOPIC
 )
@@ -90,10 +95,15 @@ class VolunteerControllerTest {
     void beforeAll() {
         Map<String, Object> consumerProps = KafkaTestUtils.consumerProps(embeddedKafkaBroker, "test-VolunteerControllerTest", false);
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+        consumerProps.put("schema.registry.url", "mock://volunteer-controller-test");
+        consumerProps.put("specific.avro.reader", true);
+        @SuppressWarnings("unchecked")
+        Deserializer<VolunteerIncidentAssignEvent> valueDeserializer =
+                (Deserializer<VolunteerIncidentAssignEvent>) (Deserializer<?>) new KafkaAvroDeserializer();
         var kafkaConsumerFactory = new DefaultKafkaConsumerFactory<>(
                 consumerProps,
                 new StringDeserializer(),
-                new JacksonJsonDeserializer<>(VolunteerIncidentAssignEvent.class, false)
+                valueDeserializer
         );
         consumer = kafkaConsumerFactory.createConsumer();
         embeddedKafkaBroker.consumeFromAnEmbeddedTopic(consumer, VOLUNTEER_INCIDENT_ASSIGN_TOPIC);
@@ -246,9 +256,9 @@ class VolunteerControllerTest {
         assertThat(key).isEqualTo(INCIDENT_ID);
 
         VolunteerIncidentAssignEvent volunteerIncidentAssignEvent = consumerRecord.value();
-        assertThat(volunteerIncidentAssignEvent.incidentId()).isEqualTo(INCIDENT_ID);
-        assertThat(volunteerIncidentAssignEvent.volunteerId()).isEqualTo(id);
-        assertThat(volunteerIncidentAssignEvent.status()).isEqualTo(status);
+        assertThat(volunteerIncidentAssignEvent.getIncidentId()).isEqualTo(INCIDENT_ID.toString());
+        assertThat(volunteerIncidentAssignEvent.getVolunteerId()).isEqualTo(id);
+        assertThat(volunteerIncidentAssignEvent.getStatus()).isEqualTo(status);
     }
 
     @Test

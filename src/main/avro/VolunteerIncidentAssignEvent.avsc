@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "VolunteerIncidentAssignEvent",
+  "namespace": "ru.rom8.rescue.volunteer.service",
+  "doc": "Событие назначения волонтёра на инцидент.",
+  "fields": [
+    {
+      "name": "incidentId",
+      "type": "string"
+    },
+    {
+      "name": "volunteerId",
+      "type": "long"
+    },
+    {
+      "name": "status",
+      "type": "string"
+    }
+  ]
+}
