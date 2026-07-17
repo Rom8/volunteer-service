@@ -18,7 +18,7 @@ services:
       retries: 5
       start_period: 10s
 
-  # kafka — Брокер сообщений Apache Kafka 4.1 для событийной коммуникации между микросервисами
+  # kafka — Брокер сообщений Apache Kafka 4.3 для событийной коммуникации между микросервисами
   kafka:
     image: apache/kafka:4.3.1
     container_name: volunteer_service-kafka
@@ -47,7 +47,7 @@ services:
 
   # schema-registry — Реестр Avro-схем Kafka-сообщений
   schema-registry:
-    image: confluentinc/cp-schema-registry:8.1.0
+    image: confluentinc/cp-schema-registry:8.2.2
     container_name: volunteer_service-schema-registry
     depends_on:
       kafka:
