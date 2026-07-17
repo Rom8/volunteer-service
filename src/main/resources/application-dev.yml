@@ -9,3 +9,8 @@ logging:
       file: ecs
   file:
     name: ${LOGGING_FILE_NAME:target/log.json}
+
+cors:
+  allowed-origins:
+    - http://localhost:${SWAGGER_UI_PORT:8091}
+    - http://127.0.0.1:${SWAGGER_UI_PORT:8091}
