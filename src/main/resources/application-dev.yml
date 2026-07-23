@@ -1,3 +1,6 @@
+server:
+  port: 8101  #todo не надо переопределять, будет k8s
+
 spring:
   output:
     ansi:
