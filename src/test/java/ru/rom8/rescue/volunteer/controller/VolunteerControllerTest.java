@@ -87,7 +87,7 @@ class VolunteerControllerTest {
     private final AtomicInteger testVolunteerCounter = new AtomicInteger();
 
     private Long id;
-    private String userId;
+    private final String userId = UUID.randomUUID().toString();
 
     Consumer<String, VolunteerIncidentAssignEvent> consumer;
 
@@ -114,11 +114,7 @@ class VolunteerControllerTest {
     @DisplayName("1. Регистрация волонтёра")
     void shouldRegisterVolunteerViaRestEndpoint() throws Exception {
         VolunteerDto volunteer = registerVolunteer();
-
         id = volunteer.getId();
-        userId = volunteer.getUserId();
-
-        assertThat(userId).startsWith("volunteer-");
         assertVolunteerMatchesRegistration(volunteer);
     }
 
@@ -166,7 +162,7 @@ class VolunteerControllerTest {
     @DisplayName("5. Получение волонтёра администратором по идентификатору")
     void shouldGetVolunteerByIdViaAdminRestEndpoint() throws Exception {
         VolunteerRegisterRequest request = uniqueRegisterRequest();
-        VolunteerDto registeredVolunteer = registerVolunteer(request);
+        VolunteerDto registeredVolunteer = registerVolunteer(UUID.randomUUID().toString(), request);
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(ADMIN_BASE_URL + "/" + registeredVolunteer.getId())
@@ -187,7 +183,7 @@ class VolunteerControllerTest {
     @DisplayName("6. Получение списка волонтёров администратором с фильтрацией")
     void shouldGetVolunteerListViaAdminRestEndpoint() throws Exception {
         VolunteerRegisterRequest request = uniqueRegisterRequest();
-        VolunteerDto registeredVolunteer = registerVolunteer(request);
+        VolunteerDto registeredVolunteer = registerVolunteer(UUID.randomUUID().toString(), request);
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(ADMIN_VOLUNTEER_LIST_URL
@@ -213,8 +209,8 @@ class VolunteerControllerTest {
     void shouldGetVolunteerListByIdsViaInternalRestEndpoint() throws Exception {
         VolunteerRegisterRequest firstRequest = uniqueRegisterRequest();
         VolunteerRegisterRequest secondRequest = uniqueRegisterRequest();
-        VolunteerDto firstVolunteer = registerVolunteer(firstRequest);
-        VolunteerDto secondVolunteer = registerVolunteer(secondRequest);
+        VolunteerDto firstVolunteer = registerVolunteer(UUID.randomUUID().toString(), firstRequest);
+        VolunteerDto secondVolunteer = registerVolunteer(UUID.randomUUID().toString(), secondRequest);
 
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(INTERNAL_VOLUNTEER_LIST_URL)
@@ -324,12 +320,13 @@ class VolunteerControllerTest {
     }
 
     private VolunteerDto registerVolunteer() throws Exception {
-        return registerVolunteer(readRegisterRequestFixture());
+        return registerVolunteer(userId, readRegisterRequestFixture());
     }
 
-    private VolunteerDto registerVolunteer(VolunteerRegisterRequest request) throws Exception {
+    private VolunteerDto registerVolunteer(String userId, VolunteerRegisterRequest request) throws Exception {
         HttpResponse<String> response = httpClient.send(
                 requestBuilder(REGISTER_ME_URL)
+                        .header(USER_ID_HEADER, userId)
                         .POST(jsonBody(request))
                         .build(),
                 HttpResponse.BodyHandlers.ofString()

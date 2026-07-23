@@ -23,8 +23,8 @@ public class VolunteerController implements VolunteerApi {
     }
 
     @Override
-    public VolunteerDto registerMe(VolunteerRegisterRequest volunteerRegisterRequest) {
-        return volunteerRegistrationService.register(volunteerRegisterRequest);
+    public VolunteerDto registerMe(String xUserId, VolunteerRegisterRequest volunteerRegisterRequest) {
+        return volunteerRegistrationService.register(xUserId, volunteerRegisterRequest);
     }
 
     @Override

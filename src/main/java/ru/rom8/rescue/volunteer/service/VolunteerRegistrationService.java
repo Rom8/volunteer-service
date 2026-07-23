@@ -11,11 +11,7 @@ import ru.rom8.rescue.volunteer.api.model.VolunteerDto;
 import ru.rom8.rescue.volunteer.api.model.VolunteerRegisterRequest;
 import ru.rom8.rescue.volunteer.api.model.VolunteerStatus;
 import ru.rom8.rescue.volunteer.api.model.VolunteerUpdateRequest;
-import ru.rom8.rescue.volunteer.domain.entity.ContactInfo;
-import ru.rom8.rescue.volunteer.domain.entity.ContactType;
-import ru.rom8.rescue.volunteer.domain.entity.Location;
-import ru.rom8.rescue.volunteer.domain.entity.LocationKind;
-import ru.rom8.rescue.volunteer.domain.entity.Volunteer;
+import ru.rom8.rescue.volunteer.domain.entity.*;
 import ru.rom8.rescue.volunteer.mapper.VolunteerMapper;
 import ru.rom8.rescue.volunteer.repository.ContactInfoRepository;
 import ru.rom8.rescue.volunteer.repository.LocationRepository;
@@ -24,14 +20,12 @@ import ru.rom8.rescue.volunteer.repository.VolunteerRepository;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class VolunteerRegistrationService {
 
-    private static final String USER_ID_PREFIX = "volunteer-";
     private static final String USER_ID_HEADER_REQUIRED_MESSAGE = "Header X-USER-ID is required";
     private static final String VOLUNTEER_NOT_FOUND_MESSAGE = "Volunteer registration not found";
 
@@ -41,11 +35,11 @@ public class VolunteerRegistrationService {
     private final VolunteerMapper volunteerMapper;
 
     @Transactional
-    public VolunteerDto register(VolunteerRegisterRequest request) {
+    public VolunteerDto register(String userId, VolunteerRegisterRequest request) {
         Location location = resolveLocation(request.getSettlementName(), request.getSettlementDistrictName());
 
         Volunteer volunteer = volunteerMapper.toEntity(request);
-        volunteer.setUserId(generateUserId());  //todo надо ли это?
+        volunteer.setUserId(userId);
         volunteer.setLocation(location);
 
         Volunteer savedVolunteer = volunteerRepository.save(volunteer);
@@ -254,9 +248,5 @@ public class VolunteerRegistrationService {
                 .addKeyValue("contact", "***")
                 .log("Volunteer contact created");
         return savedContactInfo;
-    }
-
-    private String generateUserId() {
-        return USER_ID_PREFIX + UUID.randomUUID();
     }
 }
