@@ -78,11 +78,11 @@ services:
     image: swaggerapi/swagger-ui:v5.32.7
     container_name: volunteer_service-swagger-ui
     environment:
-      SWAGGER_JSON: /openapi/volunteer-service.yaml
+      SWAGGER_JSON: /openapi/volunteer-api.yaml
     ports:
       - "${SWAGGER_UI_PORT:-8091}:8080"
     volumes:
-      - ./src/main/resources/openapi/volunteer-service.yaml:/openapi/volunteer-service.yaml:ro
+      - ./target/openapi/volunteer-api.yaml:/openapi/volunteer-api.yaml:ro
 
 volumes:
   volunteer_service_postgres_data:

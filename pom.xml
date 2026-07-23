@@ -143,6 +143,30 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>unpack-volunteer-api-contract</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>ru.rom8.rescue</groupId>
+                                    <artifactId>volunteer-api-contract</artifactId>
+                                    <version>0.0.1-SNAPSHOT</version>
+                                    <includes>openapi/volunteer-api.yaml</includes>
+                                    <outputDirectory>${project.build.directory}</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
                 <version>${openapi-generator.version}</version>
@@ -153,7 +177,7 @@
                             <goal>generate</goal>
                         </goals>
                         <configuration>
-                            <inputSpec>${project.basedir}/src/main/resources/openapi/volunteer-service.yaml</inputSpec>
+                            <inputSpec>${project.build.directory}/openapi/volunteer-api.yaml</inputSpec>
                             <generatorName>spring</generatorName>
                             <apiPackage>ru.rom8.rescue.volunteer.api</apiPackage>
                             <modelPackage>ru.rom8.rescue.volunteer.api.model</modelPackage>
